@@ -3,7 +3,8 @@ import Hero from "../Hero";
 import RoomCard from "../product";
 import { assets, cities, exclusiveOffers, testimonials, roomsDummyData } from "../../assets/assets";
 
-const Home = () => {
+const Home = ({ theme }) => {
+  const isDark = theme === "dark";
   const stayTypes = [
     { title: "City escapes", image: assets.roomImg1, tag: "Urban" },
     { title: "Beach retreats", image: assets.roomImg2, tag: "Relax" },
@@ -42,33 +43,33 @@ const Home = () => {
   ];
 
   return (
-    <div className="bg-slate-950 text-white">
-      <Hero />
+    <div className={isDark ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}>
+      <Hero theme={theme} />
 
-      <section className="relative overflow-hidden bg-slate-950 px-6 py-16 md:px-12 lg:px-20 xl:px-28">
+      <section className={`relative overflow-hidden px-6 py-16 md:px-12 lg:px-20 xl:px-28 ${isDark ? "bg-slate-950" : "bg-slate-50"}`}>
         <div className="pointer-events-none absolute right-0 top-24 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl xl:h-80 xl:w-80" />
         <div className="mx-auto grid max-w-7xl gap-16">
           <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-end">
             <div className="space-y-4">
-              <span className="inline-flex rounded-full bg-sky-500/15 px-4 py-2 text-sm font-semibold uppercase tracking-[0.28em] text-sky-300">
+              <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold uppercase tracking-[0.28em] ${isDark ? "bg-sky-500/15 text-sky-300" : "bg-sky-100 text-sky-700"}`}>
                 Modern hotel journeys
               </span>
               <h2 className="text-4xl font-semibold leading-tight sm:text-5xl lg:text-6xl">
                 A cleaner travel experience with luxury, speed, and thoughtful design.
               </h2>
-              <p className="max-w-3xl text-base leading-8 text-slate-300 sm:text-lg">
+              <p className={`max-w-3xl text-base leading-8 sm:text-lg ${isDark ? "text-slate-300" : "text-slate-600"}`}>
                 QuickStay brings a sleek new booking flow with premium stays, curated trips, and fewer distractions so you can focus on the perfect getaway.
               </p>
             </div>
-            <div className="rounded-[2rem] bg-slate-900/95 p-8 shadow-2xl ring-1 ring-slate-800">
+            <div className={`rounded-[2rem] p-8 shadow-2xl ring-1 ${isDark ? "bg-slate-900/95 ring-slate-800" : "bg-white ring-slate-200"}`}>
               <div className="grid gap-4">
                 {features.map((feature) => (
-                  <div key={feature.label} className="flex items-center justify-between gap-4 rounded-3xl bg-slate-800 px-5 py-4 text-sm text-white transition hover:bg-slate-700/90">
+                  <div key={feature.label} className={`flex items-center justify-between gap-4 rounded-3xl px-5 py-4 text-sm transition ${isDark ? "bg-slate-800 text-white hover:bg-slate-700/90" : "bg-slate-100 text-slate-900 hover:bg-slate-200"}`}>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{feature.label}</p>
+                      <p className={`text-xs uppercase tracking-[0.25em] ${isDark ? "text-slate-400" : "text-slate-500"}`}>{feature.label}</p>
                       <p className={`mt-2 text-2xl font-semibold ${feature.accent}`}>{feature.value}</p>
                     </div>
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 text-slate-100">✓</span>
+                    <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${isDark ? "bg-slate-800 text-slate-100" : "bg-white text-slate-900"}`}>✓</span>
                   </div>
                 ))}
               </div>
@@ -76,27 +77,27 @@ const Home = () => {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.75fr_1fr] xl:items-center">
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900/95 p-8 shadow-2xl ring-1 ring-slate-800">
+            <div className={`relative overflow-hidden rounded-[2.5rem] p-8 shadow-2xl ring-1 ${isDark ? "bg-slate-900/95 ring-slate-800" : "bg-white ring-slate-200"}`}>
               <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-sky-500/15 to-transparent" />
               <div className="relative space-y-6">
-                <span className="inline-flex rounded-full bg-sky-500/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-sky-300 shadow-sm">
+                <span className={`inline-flex rounded-full px-4 py-2 text-xs uppercase tracking-[0.28em] shadow-sm ${isDark ? "bg-sky-500/10 text-sky-300" : "bg-sky-100 text-sky-700"}`}>
                   Destination spotlight</span>
-                <h3 className="text-3xl font-semibold sm:text-4xl text-white">Escape to a destination built for design lovers.</h3>
-                <p className="max-w-2xl text-base leading-8 text-slate-300">
+                <h3 className={`text-3xl font-semibold sm:text-4xl ${isDark ? "text-white" : "text-slate-900"}`}>Escape to a destination built for design lovers.</h3>
+                <p className={`max-w-2xl text-base leading-8 ${isDark ? "text-slate-300" : "text-slate-600"}`}>
                   Browse handpicked hotels with modern interiors, rooftop pools, and polished service — all ready for your next city break.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-3xl bg-slate-100 p-5">
-                    <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Ideal for</p>
-                    <p className="mt-3 text-lg font-semibold text-slate-900">Business trips</p>
+                  <div className={`rounded-3xl p-5 ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+                    <p className={`text-xs uppercase tracking-[0.25em] ${isDark ? "text-slate-400" : "text-slate-500"}`}>Ideal for</p>
+                    <p className={`mt-3 text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>Business trips</p>
                   </div>
-                  <div className="rounded-3xl bg-slate-100 p-5">
-                    <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Style</p>
-                    <p className="mt-3 text-lg font-semibold text-slate-900">Minimal luxury</p>
+                  <div className={`rounded-3xl p-5 ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+                    <p className={`text-xs uppercase tracking-[0.25em] ${isDark ? "text-slate-400" : "text-slate-500"}`}>Style</p>
+                    <p className={`mt-3 text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>Minimal luxury</p>
                   </div>
-                  <div className="rounded-3xl bg-slate-100 p-5">
-                    <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Guests love</p>
-                    <p className="mt-3 text-lg font-semibold text-slate-900">City views</p>
+                  <div className={`rounded-3xl p-5 ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+                    <p className={`text-xs uppercase tracking-[0.25em] ${isDark ? "text-slate-400" : "text-slate-500"}`}>Guests love</p>
+                    <p className={`mt-3 text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>City views</p>
                   </div>
                 </div>
               </div>
@@ -120,20 +121,20 @@ const Home = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[2.5rem] bg-slate-900/95 px-8 py-12 shadow-2xl ring-1 ring-slate-800">
+          <div className={`overflow-hidden rounded-[2.5rem] px-8 py-12 shadow-2xl ring-1 ${isDark ? "bg-slate-900/95 ring-slate-800" : "bg-white ring-slate-200"}`}>
             <div className="grid gap-10 xl:grid-cols-[1.2fr_0.8fr] xl:items-center">
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-sky-400">Live better stays</p>
-                <h2 className="mt-4 text-4xl font-semibold sm:text-5xl text-white">Your modern hotel experience starts here.</h2>
+                <h2 className={`mt-4 text-4xl font-semibold sm:text-5xl ${isDark ? "text-white" : "text-slate-900"}`}>Your modern hotel experience starts here.</h2>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 {benefits.map((item) => (
-                  <div key={item.title} className="rounded-3xl bg-slate-800/90 p-5 shadow-sm ring-1 ring-slate-700">
-                    <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-3xl bg-sky-100 text-sky-600">
+                  <div key={item.title} className={`rounded-3xl p-5 shadow-sm ring-1 ${isDark ? "bg-slate-800/90 ring-slate-700" : "bg-slate-100 ring-slate-200"}`}>
+                    <div className={`mb-4 inline-flex h-14 w-14 items-center justify-center rounded-3xl ${isDark ? "bg-sky-100 text-sky-600" : "bg-sky-500 text-white"}`}>
                       <img src={item.icon} alt={item.title} className="h-7 w-7" />
                     </div>
-                    <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
+                    <h3 className={`text-lg font-semibold ${isDark ? "text-slate-900" : "text-slate-900"}`}>{item.title}</h3>
+                    <p className={`mt-2 text-sm leading-6 ${isDark ? "text-slate-600" : "text-slate-600"}`}>{item.description}</p>
                   </div>
                 ))}
               </div>
@@ -141,24 +142,24 @@ const Home = () => {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-            <div className="rounded-[2.5rem] bg-slate-900/95 p-10 text-white shadow-2xl ring-1 ring-slate-800">
+            <div className={`rounded-[2.5rem] p-10 shadow-2xl ring-1 ${isDark ? "bg-slate-900/95 text-white ring-slate-800" : "bg-white text-slate-900 ring-slate-200"}`}>
               <div className="space-y-5">
                 <p className="text-sm uppercase tracking-[0.35em] text-sky-600">How it works</p>
                 <h2 className="text-4xl font-semibold sm:text-5xl">A slick booking flow that feels modern.</h2>
-                <p className="max-w-2xl text-base leading-8 text-slate-600">
+                <p className={`max-w-2xl text-base leading-8 ${isDark ? "text-slate-600" : "text-slate-600"}`}>
                   We pared back the experience to the essentials — search, compare, and book with confidence.
                 </p>
               </div>
               <div className="mt-10 grid gap-4">
                 {steps.map((step) => (
-                  <div key={step.step} className="rounded-[2rem] border border-slate-700 bg-slate-800/90 p-6 transition hover:bg-slate-700/90">
+                  <div key={step.step} className={`rounded-[2rem] border p-6 transition ${isDark ? "border-slate-700 bg-slate-800/90 hover:bg-slate-700/90" : "border-slate-200 bg-slate-50 hover:bg-slate-100"}`}>
                     <div className="flex items-center gap-4">
                       <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-sky-400 text-sm font-semibold text-slate-950">
                         {step.step}
                       </span>
                       <div>
-                        <h3 className="text-xl font-semibold text-white">{step.title}</h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-300">{step.description}</p>
+                        <h3 className={`text-xl font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>{step.title}</h3>
+                        <p className={`mt-2 text-sm leading-6 ${isDark ? "text-slate-300" : "text-slate-600"}`}>{step.description}</p>
                       </div>
                     </div>
                   </div>
@@ -168,7 +169,7 @@ const Home = () => {
 
             <div className="space-y-6">
               {stayTypes.map((stay, index) => (
-                <div key={stay.title} className="group overflow-hidden rounded-[2rem] bg-slate-900/90 ring-1 ring-slate-800 shadow-sm transition hover:-translate-y-1">
+                <div key={stay.title} className={`group overflow-hidden rounded-[2rem] ring-1 shadow-sm transition hover:-translate-y-1 ${isDark ? "bg-slate-900/90 ring-slate-800" : "bg-white ring-slate-200"}`}>
                   <div className="relative h-52 bg-cover bg-center" style={{ backgroundImage: `url(${stay.image})` }}>
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                     <div className="absolute bottom-5 left-5">

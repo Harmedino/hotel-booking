@@ -53,16 +53,16 @@ const Footer = ({ theme }) => {
           </div>
         </div>
 
-        <div className="rounded-[2rem] bg-slate-900/90 p-8 ring-1 ring-slate-700/80 shadow-sm md:flex md:items-center md:justify-between md:gap-8">
+        <div className={`rounded-[2rem] p-8 ring-1 shadow-sm md:flex md:items-center md:justify-between md:gap-8 ${isDark ? "bg-slate-900/90 ring-slate-700/80" : "bg-slate-800/90 ring-slate-600/80"}`}>
           <div className="space-y-2">
             <p className="text-lg font-semibold text-white">Stay in the loop</p>
-            <p className="text-sm text-slate-400">Subscribe for travel deals, new stays, and exclusive offers.</p>
+            <p className={`text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>Subscribe for travel deals, new stays, and exclusive offers.</p>
           </div>
           <form className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center md:mt-0">
             <input
               type="email"
               placeholder="Enter your email"
-              className="min-w-[240px] rounded-full border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-sky-300 focus:ring focus:ring-sky-200/50"
+              className={`min-w-[240px] rounded-full border px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-sky-300 focus:ring focus:ring-sky-200/50 ${isDark ? "border-slate-600 bg-slate-800 text-white" : "border-slate-300 bg-slate-50 text-slate-900"}`}
             />
             <button className="rounded-full bg-gradient-to-r from-sky-600 to-cyan-500 px-6 py-3 text-sm font-semibold text-white transition hover:opacity-95">
               Subscribe
@@ -70,7 +70,7 @@ const Footer = ({ theme }) => {
           </form>
         </div>
 
-        <div className="flex flex-col gap-6 border-t border-slate-800 pt-8 text-sm text-slate-400 md:flex-row md:items-center md:justify-between">
+        <div className={`flex flex-col gap-6 border-t pt-8 text-sm md:flex-row md:items-center md:justify-between ${isDark ? "border-slate-800 text-slate-400" : "border-slate-700 text-slate-500"}`}>
           <p>© {new Date().getFullYear()} QuickStay. All rights reserved.</p>
           <div className="flex flex-wrap gap-5 text-slate-400">
             <a href="#" className="transition hover:text-white">Twitter</a>
