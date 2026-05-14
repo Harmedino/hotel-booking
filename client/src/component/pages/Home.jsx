@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import Hero from "../Hero";
 import RoomCard from "../product";
-import { assets, exclusiveOffers, testimonials, roomsDummyData } from "../../assets/assets";
+import { exclusiveOffers, testimonials, roomsDummyData } from "../../assets/assets";
 
 const Home = () => {
   return (

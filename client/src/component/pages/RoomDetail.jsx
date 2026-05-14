@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { assets, roomCommonData, roomsDummyData } from "../../assets/assets";
+import { assets, facilityIcons, roomCommonData, roomsDummyData } from "../../assets/assets";
 
 const RoomDetail = () => {
   const { id } = useParams();
@@ -47,7 +47,7 @@ const RoomDetail = () => {
               <div className="grid gap-4 sm:grid-cols-2">
                 {room.amenities.map((name) => (
                   <div key={name} className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                    <img src={assets[`${name.replace(/\s/g, "")}Icon`] || assets.roomServiceIcon} alt={name} className="h-6 w-6" />
+                    <img src={facilityIcons[name] || assets.roomServiceIcon} alt={name} className="h-6 w-6" />
                     <p className="text-sm text-slate-700">{name}</p>
                   </div>
                 ))}
