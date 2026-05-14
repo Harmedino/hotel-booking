@@ -46,6 +46,7 @@ const Home = () => {
       <Hero />
 
       <section className="relative overflow-hidden bg-slate-950 px-6 py-16 md:px-12 lg:px-20 xl:px-28">
+        <div className="pointer-events-none absolute right-0 top-24 h-64 w-64 rounded-full bg-sky-500/10 blur-3xl xl:h-80 xl:w-80" />
         <div className="mx-auto grid max-w-7xl gap-16">
           <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-end">
             <div className="space-y-4">
@@ -59,10 +60,10 @@ const Home = () => {
                 QuickStay brings a sleek new booking flow with premium stays, curated trips, and fewer distractions so you can focus on the perfect getaway.
               </p>
             </div>
-            <div className="rounded-[2rem] bg-slate-900/90 p-8 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
+            <div className="rounded-[2rem] bg-slate-900/95 p-8 shadow-2xl ring-1 ring-slate-800">
               <div className="grid gap-4">
                 {features.map((feature) => (
-                  <div key={feature.label} className="flex items-center justify-between gap-4 rounded-3xl bg-white/5 px-5 py-4 text-sm text-slate-200 transition hover:bg-white/10">
+                  <div key={feature.label} className="flex items-center justify-between gap-4 rounded-3xl bg-slate-800 px-5 py-4 text-sm text-white transition hover:bg-slate-700/90">
                     <div>
                       <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{feature.label}</p>
                       <p className={`mt-2 text-2xl font-semibold ${feature.accent}`}>{feature.value}</p>
@@ -75,27 +76,27 @@ const Home = () => {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.75fr_1fr] xl:items-center">
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900/70 p-8 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
-              <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-sky-500/20 to-transparent" />
+            <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900/95 p-8 shadow-2xl ring-1 ring-slate-800">
+              <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-sky-500/15 to-transparent" />
               <div className="relative space-y-6">
-                <span className="inline-flex rounded-full bg-sky-500/15 px-4 py-2 text-xs uppercase tracking-[0.28em] text-sky-200 shadow-sm">
+                <span className="inline-flex rounded-full bg-sky-500/10 px-4 py-2 text-xs uppercase tracking-[0.28em] text-sky-300 shadow-sm">
                   Destination spotlight</span>
-                <h3 className="text-3xl font-semibold sm:text-4xl">Escape to a destination built for design lovers.</h3>
+                <h3 className="text-3xl font-semibold sm:text-4xl text-white">Escape to a destination built for design lovers.</h3>
                 <p className="max-w-2xl text-base leading-8 text-slate-300">
                   Browse handpicked hotels with modern interiors, rooftop pools, and polished service — all ready for your next city break.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-3xl bg-slate-950/70 p-5">
-                    <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Ideal for</p>
-                    <p className="mt-3 text-lg font-semibold text-white">Business trips</p>
+                  <div className="rounded-3xl bg-slate-100 p-5">
+                    <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Ideal for</p>
+                    <p className="mt-3 text-lg font-semibold text-slate-900">Business trips</p>
                   </div>
-                  <div className="rounded-3xl bg-slate-950/70 p-5">
-                    <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Style</p>
-                    <p className="mt-3 text-lg font-semibold text-white">Minimal luxury</p>
+                  <div className="rounded-3xl bg-slate-100 p-5">
+                    <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Style</p>
+                    <p className="mt-3 text-lg font-semibold text-slate-900">Minimal luxury</p>
                   </div>
-                  <div className="rounded-3xl bg-slate-950/70 p-5">
-                    <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Guests love</p>
-                    <p className="mt-3 text-lg font-semibold text-white">City views</p>
+                  <div className="rounded-3xl bg-slate-100 p-5">
+                    <p className="text-xs uppercase tracking-[0.25em] text-slate-500">Guests love</p>
+                    <p className="mt-3 text-lg font-semibold text-slate-900">City views</p>
                   </div>
                 </div>
               </div>
@@ -119,20 +120,20 @@ const Home = () => {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[2.5rem] bg-slate-900/90 px-8 py-12 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
+          <div className="overflow-hidden rounded-[2.5rem] bg-slate-900/95 px-8 py-12 shadow-2xl ring-1 ring-slate-800">
             <div className="grid gap-10 xl:grid-cols-[1.2fr_0.8fr] xl:items-center">
               <div>
-                <p className="text-sm uppercase tracking-[0.35em] text-sky-300">Live better stays</p>
-                <h2 className="mt-4 text-4xl font-semibold sm:text-5xl">Your modern hotel experience starts here.</h2>
+                <p className="text-sm uppercase tracking-[0.35em] text-sky-400">Live better stays</p>
+                <h2 className="mt-4 text-4xl font-semibold sm:text-5xl text-white">Your modern hotel experience starts here.</h2>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 {benefits.map((item) => (
-                  <div key={item.title} className="rounded-3xl bg-slate-950/80 p-5">
-                    <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-3xl bg-slate-800 text-sky-300">
+                  <div key={item.title} className="rounded-3xl bg-slate-800/90 p-5 shadow-sm ring-1 ring-slate-700">
+                    <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-3xl bg-sky-100 text-sky-600">
                       <img src={item.icon} alt={item.title} className="h-7 w-7" />
                     </div>
-                    <h3 className="text-lg font-semibold text-white">{item.title}</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">{item.description}</p>
+                    <h3 className="text-lg font-semibold text-slate-900">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>
                   </div>
                 ))}
               </div>
@@ -140,17 +141,17 @@ const Home = () => {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-            <div className="rounded-[2.5rem] bg-white/5 p-10 text-slate-100 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
+            <div className="rounded-[2.5rem] bg-slate-900/95 p-10 text-white shadow-2xl ring-1 ring-slate-800">
               <div className="space-y-5">
-                <p className="text-sm uppercase tracking-[0.35em] text-sky-300">How it works</p>
+                <p className="text-sm uppercase tracking-[0.35em] text-sky-600">How it works</p>
                 <h2 className="text-4xl font-semibold sm:text-5xl">A slick booking flow that feels modern.</h2>
-                <p className="max-w-2xl text-base leading-8 text-slate-300">
+                <p className="max-w-2xl text-base leading-8 text-slate-600">
                   We pared back the experience to the essentials — search, compare, and book with confidence.
                 </p>
               </div>
               <div className="mt-10 grid gap-4">
                 {steps.map((step) => (
-                  <div key={step.step} className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-6 transition hover:bg-slate-900">
+                  <div key={step.step} className="rounded-[2rem] border border-slate-700 bg-slate-800/90 p-6 transition hover:bg-slate-700/90">
                     <div className="flex items-center gap-4">
                       <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-sky-400 text-sm font-semibold text-slate-950">
                         {step.step}
@@ -167,11 +168,11 @@ const Home = () => {
 
             <div className="space-y-6">
               {stayTypes.map((stay, index) => (
-                <div key={stay.title} className="group overflow-hidden rounded-[2rem] bg-slate-900/80 transition hover:-translate-y-1">
+                <div key={stay.title} className="group overflow-hidden rounded-[2rem] bg-slate-900/90 ring-1 ring-slate-800 shadow-sm transition hover:-translate-y-1">
                   <div className="relative h-52 bg-cover bg-center" style={{ backgroundImage: `url(${stay.image})` }}>
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                     <div className="absolute bottom-5 left-5">
-                      <p className="text-xs uppercase tracking-[0.25em] text-sky-300">{stay.tag}</p>
+                      <p className="text-xs uppercase tracking-[0.25em] text-sky-600">{stay.tag}</p>
                       <h3 className="mt-2 text-2xl font-semibold text-white">{stay.title}</h3>
                     </div>
                   </div>
@@ -186,21 +187,21 @@ const Home = () => {
             ))}
           </div>
 
-          <div className="rounded-[2.5rem] bg-slate-900/80 px-8 py-12 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
+          <div className="rounded-[2.5rem] bg-slate-900/95 px-8 py-12 shadow-2xl ring-1 ring-slate-800">
             <div className="grid gap-10 lg:grid-cols-[1.5fr_1fr] lg:items-center">
               <div className="space-y-4">
-                <p className="text-sm uppercase tracking-[0.35em] text-sky-300">Guest stories</p>
-                <h2 className="text-4xl font-semibold sm:text-5xl">What travelers love about modern stays.</h2>
+                <p className="text-sm uppercase tracking-[0.35em] text-sky-400">Guest stories</p>
+                <h2 className="text-4xl font-semibold sm:text-5xl text-white">What travelers love about modern stays.</h2>
               </div>
               <div className="grid gap-4">
                 {testimonials.map((testimonial) => (
-                  <div key={testimonial.id} className="rounded-[2rem] bg-slate-950/80 p-6 text-slate-200 transition hover:bg-slate-900">
+                  <div key={testimonial.id} className="rounded-[2rem] bg-slate-800/90 p-6 shadow-sm transition hover:shadow-lg">
                     <p className="text-sm leading-7 text-slate-300">“{testimonial.review}”</p>
                     <div className="mt-5 flex items-center gap-3">
                       <img src={testimonial.image} alt={testimonial.name} className="h-12 w-12 rounded-full object-cover" />
                       <div>
-                        <p className="font-semibold text-white">{testimonial.name}</p>
-                        <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{testimonial.address}</p>
+                        <p className="font-semibold text-slate-900">{testimonial.name}</p>
+                        <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{testimonial.address}</p>
                       </div>
                     </div>
                   </div>
@@ -209,7 +210,7 @@ const Home = () => {
             </div>
           </div>
 
-          <div className="rounded-[2.5rem] bg-gradient-to-r from-sky-500/20 via-slate-900/70 to-slate-900/70 px-8 py-14 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl">
+          <div className="rounded-[2.5rem] bg-gradient-to-r from-sky-600 via-slate-900 to-slate-950 px-8 py-14 shadow-2xl ring-1 ring-slate-800">
             <div className="grid gap-8 lg:grid-cols-[1.4fr_0.8fr] lg:items-center">
               <div>
                 <p className="text-sm uppercase tracking-[0.35em] text-sky-300">Ready to start</p>
@@ -222,9 +223,9 @@ const Home = () => {
                 <input
                   type="email"
                   placeholder="you@example.com"
-                  className="rounded-3xl border border-white/10 bg-slate-950/90 px-5 py-4 text-sm text-white outline-none transition focus:border-sky-300 focus:ring focus:ring-sky-300/20"
+                  className="rounded-3xl border border-slate-700 bg-slate-950 px-5 py-4 text-sm text-white outline-none transition focus:border-sky-300 focus:ring focus:ring-sky-300/20"
                 />
-                <button className="rounded-3xl bg-sky-400 px-7 py-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-300">
+                <button className="rounded-3xl bg-white px-7 py-4 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
                   Subscribe
                 </button>
               </div>
