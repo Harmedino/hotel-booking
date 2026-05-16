@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { assets, cities, roomsDummyData } from "../../assets/assets";
+import { assets, cities } from "../../assets/assets";
+import { getRooms } from "../../api";
 import RoomCard from "../product";
 
 const Rooms = ({ theme }) => {
@@ -11,13 +12,27 @@ const Rooms = ({ theme }) => {
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [guests, setGuests] = useState(searchParams.get("guests") || "1");
 
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    getRooms()
+      .then((data) => {
+        if (mounted) setRooms(data || []);
+      })
+      .catch((err) => console.error('Failed to load rooms', err))
+      .finally(() => mounted && setLoading(false));
+    return () => (mounted = false);
+  }, []);
+
   const filteredRooms = useMemo(() => {
     const normalizedDestination = destination.trim().toLowerCase();
-    return roomsDummyData.filter((room) => {
+    return rooms.filter((room) => {
       if (!normalizedDestination) return true;
-      return room.hotel.city.toLowerCase().includes(normalizedDestination);
+      return (room.city || room.hotel?.city || '').toLowerCase().includes(normalizedDestination);
     });
-  }, [destination]);
+  }, [destination, rooms]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -107,9 +122,13 @@ const Rooms = ({ theme }) => {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filteredRooms.map((room) => (
-            <RoomCard key={room._id} room={room} theme={theme} />
-          ))}
+          {loading ? (
+            <div className="col-span-full text-center py-10">Loading rooms...</div>
+          ) : (
+            filteredRooms.map((room) => (
+              <RoomCard key={room.id || room._id} room={room} theme={theme} />
+            ))
+          )}
           {filteredRooms.length === 0 && (
             <div className={`rounded-3xl border border-dashed p-8 text-center ${isDark ? "border-slate-700 bg-slate-900 text-slate-400" : "border-slate-300 bg-white text-slate-500"}`}>
               No rooms found for that destination. Try a broader search.
