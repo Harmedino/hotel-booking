@@ -1,7 +1,8 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { assets, cities } from "../../assets/assets";
-import { getRooms } from "../../api";
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchRooms } from '../../store/roomsSlice';
 import RoomCard from "../product";
 
 const Rooms = ({ theme }) => {
@@ -12,19 +13,12 @@ const Rooms = ({ theme }) => {
   const [checkOut, setCheckOut] = useState(searchParams.get("checkOut") || "");
   const [guests, setGuests] = useState(searchParams.get("guests") || "1");
 
-  const [rooms, setRooms] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
+  const { items: rooms, loading } = useSelector((state) => state.rooms || { items: [], loading: false });
 
   useEffect(() => {
-    let mounted = true;
-    getRooms()
-      .then((data) => {
-        if (mounted) setRooms(data || []);
-      })
-      .catch((err) => console.error('Failed to load rooms', err))
-      .finally(() => mounted && setLoading(false));
-    return () => (mounted = false);
-  }, []);
+    dispatch(fetchRooms());
+  }, [dispatch]);
 
   const filteredRooms = useMemo(() => {
     const normalizedDestination = destination.trim().toLowerCase();
