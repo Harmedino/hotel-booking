@@ -1,0 +1,41 @@
+# Node modules
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Env files
+.env
+.env.*
+
+# Build outputs
+dist/
+build/
+client/dist/
+server/dist/
+
+# Vite cache
+node_modules/.vite/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+
+# Misc
+*.pem
+*.key
