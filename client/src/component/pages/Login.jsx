@@ -9,10 +9,10 @@ const Login = ({ theme }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // TODO: Implement login logic
-    console.log("Login attempt:", { email, password });
-    // For now, just navigate to home
-    navigate("/");
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("loggedInUserEmail", email);
+    console.log("Login successful:", { email });
+    navigate("/my-bookings");
   };
 
   return (

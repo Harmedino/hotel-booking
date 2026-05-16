@@ -38,7 +38,7 @@ const Navbar = ({ theme, toggleTheme }) => {
     >
       <Link to="/" className="flex items-center gap-3">
         <img src={assets.logo} alt="logo" className="h-9" />
-        <span className="font-semibold text-white">QuickStay</span>
+          <span className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>QuickStay</span>
       </Link>
 
       <div className="hidden md:flex items-center gap-6">
