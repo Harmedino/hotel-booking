@@ -1,23 +1,51 @@
 # Deploying
 
-Both apps deploy to [Render](https://render.com) from `render.yaml` (free tier).
+Repo: https://github.com/Harmedino/hotel-booking
 
-1. Push this branch, then in Render: **New → Blueprint** → pick this repo.
-   It creates `hotel-booking-api` (Express) and `hotel-booking-client` (static site).
-2. When prompted for env vars:
-   - `hotel-booking-client` → `VITE_API_URL` = `https://hotel-booking-api.onrender.com`
-   - `hotel-booking-api` → `CLIENT_URL` = `https://hotel-booking-client.onrender.com`
-   (use the real URLs Render shows you; no trailing slash)
-3. `VITE_API_URL` is baked in at build time — if you change it, redeploy the client.
+- **Frontend** (`client/`) → Vercel
+- **Backend** (`server/`) → Render
 
-Check: `https://<api-url>/api/health` should return `{"status":"ok"}`.
+Deploy the backend first — the frontend needs its URL.
 
-## Alternative: frontend on Vercel
-Import the repo, set **Root Directory** = `client`, add `VITE_API_URL`.
-`client/vercel.json` handles React Router deep links. Add the Vercel URL to the API's `CLIENT_URL`
-(comma-separate multiple origins).
+## 1. Backend on Render
+**New → Web Service** → pick `Harmedino/hotel-booking`, then:
 
-## Caveats
-- Free Render services sleep after ~15 min idle; first request takes ~30–50s.
-- Data lives in memory (`server/data/store.js`) — bookings are wiped on every restart/redeploy.
-  Swap in a real DB (e.g. MongoDB Atlas / Postgres) before real users touch it.
+| Setting | Value |
+|---|---|
+| Branch | `master` |
+| Root Directory | `server` |
+| Runtime | Node |
+| Build Command | `npm ci` |
+| Start Command | `npm start` |
+| Instance Type | Free |
+| Health Check Path | `/api/health` |
+
+Environment variables: `NODE_VERSION` = `20`. Leave `CLIENT_URL` unset for now.
+
+Deploy, copy the URL (e.g. `https://hotel-booking-api.onrender.com`), and check
+`<url>/api/health` returns `{"status":"ok"}`.
+
+## 2. Frontend on Vercel
+**Add New → Project** → import `Harmedino/hotel-booking`, then:
+
+| Setting | Value |
+|---|---|
+| Framework Preset | Vite |
+| Root Directory | `client` |
+| Build Command | `npm run build` (default) |
+| Output Directory | `dist` (default) |
+
+Environment variable: `VITE_API_URL` = your Render URL (no trailing slash).
+
+Deploy and copy the Vercel URL. `client/vercel.json` makes deep links like `/rooms/r1` work on refresh.
+
+## 3. Connect them
+Back on Render → your service → **Environment** → add
+`CLIENT_URL` = your Vercel URL (no trailing slash). Save; Render redeploys.
+Comma-separate to allow several origins (e.g. a custom domain).
+
+## Gotchas
+- `VITE_API_URL` is baked in at build time. Change it → **redeploy** on Vercel.
+- CORS error in the browser console → `CLIENT_URL` on Render doesn't exactly match the Vercel URL.
+- Render free tier sleeps after ~15 min idle; first request takes ~30–50s.
+- Data is in memory (`server/data/store.js`) — bookings reset on every restart/redeploy.
