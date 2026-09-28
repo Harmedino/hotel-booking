@@ -1,0 +1,15 @@
+services:
+  # Backend API (Express). Frontend is hosted on Vercel.
+  - type: web
+    name: hotel-booking-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: CLIENT_URL
+        sync: false # your Vercel URL, e.g. https://hotel-booking.vercel.app
