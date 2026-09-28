@@ -1,0 +1,30 @@
+services:
+  # Backend API (Express)
+  - type: web
+    name: hotel-booking-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: CLIENT_URL
+        sync: false # set to your frontend URL after first deploy
+
+  # Frontend (Vite + React static site)
+  - type: web
+    name: hotel-booking-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false # set to your backend URL, e.g. https://hotel-booking-api.onrender.com

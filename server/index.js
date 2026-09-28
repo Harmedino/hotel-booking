@@ -10,7 +10,13 @@ const authRouter = require('./routes/auth');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// CLIENT_URL: comma-separated allowed origins. Unset = allow all (local dev).
+const allowedOrigins = (process.env.CLIENT_URL || '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+app.use(cors(allowedOrigins.length ? { origin: allowedOrigins } : undefined));
 app.use(express.json());
 app.use(logger);
 
