@@ -24,8 +24,12 @@ Collections, indexes and demo data are created automatically the first time the 
 | Root Directory | `server` |
 | Runtime | Node |
 | Build Command | `npm ci` |
-| Start Command | `npm start` (runs `node index.js`; there is no `dist/` build output) |
+| Start Command | `npm start` (runs `node index.js`) |
 | Health Check Path | `/api/health` |
+
+The API is plain JavaScript with no compile step. `npm run build` installs
+dependencies if needed and writes `dist/index.js`, so the alternative pair
+Build `npm run build` + Start `node dist/index.js` works too.
 
 Environment variables:
 
@@ -40,7 +44,8 @@ Environment variables:
 | `SEED_ON_EMPTY` | optional: `true` seeds demo hotels and demo logins into an empty database once; never touches existing data |
 | `STRIPE_SECRET_KEY` | optional, enables card payments |
 | `STRIPE_WEBHOOK_SECRET` | optional, from a Stripe webhook pointing at `<render-url>/api/payments/webhook` (event `checkout.session.completed`) |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | optional, enables emails |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | optional, enables emails |
+| `MAIL_FROM` | optional, format `QuickStay <no-reply@yourdomain.com>` |
 
 Check `<render-url>/api/health` returns `{"status":"ok"}`.
 
