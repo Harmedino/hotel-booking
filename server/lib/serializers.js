@@ -1,96 +1,90 @@
-// Map DB rows (snake_case) to API shapes (camelCase).
+// Map Mongo documents to the API's JSON shapes.
+const id = (v) => (v && v._id ? String(v._id) : v ? String(v) : null);
 
-function room(r) {
+function hotelSummary(h) {
+  if (!h || !h._id) return undefined;
+  return { id: String(h._id), name: h.name, city: h.city, country: h.country, address: h.address, contact: h.contact, description: h.description };
+}
+
+function room(r, extra = {}) {
   return {
-    id: r.id,
-    hotelId: r.hotel_id,
-    roomType: r.room_type,
+    id: String(r._id),
+    hotelId: id(r.hotel),
+    roomType: r.roomType,
     description: r.description,
-    pricePerNight: r.price_per_night,
-    maxGuests: r.max_guests,
-    totalUnits: r.total_units,
+    pricePerNight: r.pricePerNight,
+    maxGuests: r.maxGuests,
+    totalUnits: r.totalUnits,
     amenities: r.amenities,
     images: r.images,
-    isAvailable: r.is_available,
-    rating: r.rating_avg !== undefined && r.rating_avg !== null ? Math.round(r.rating_avg * 10) / 10 : null,
-    reviewCount: r.review_count ?? 0,
-    unitsLeft: r.units_left ?? undefined,
-    createdAt: r.created_at,
-    hotel: r.hotel_name !== undefined
-      ? {
-          id: r.hotel_id,
-          name: r.hotel_name,
-          city: r.hotel_city,
-          country: r.hotel_country,
-          address: r.hotel_address,
-          contact: r.hotel_contact,
-          description: r.hotel_description,
-        }
-      : undefined,
+    isAvailable: r.isAvailable,
+    rating: r.ratingAvg ? Math.round(r.ratingAvg * 10) / 10 : null,
+    reviewCount: r.reviewCount || 0,
+    createdAt: r.createdAt,
+    hotel: hotelSummary(r.hotel),
+    ...extra,
   };
 }
 
-function hotel(h) {
+function hotel(h, extra = {}) {
   return {
-    id: h.id,
-    ownerId: h.owner_id,
+    id: String(h._id),
+    ownerId: id(h.owner),
     name: h.name,
     description: h.description,
     address: h.address,
     city: h.city,
     country: h.country,
     contact: h.contact,
-    coverImage: h.cover_image,
-    isActive: h.is_active,
-    roomCount: h.room_count ?? undefined,
-    createdAt: h.created_at,
+    coverImage: h.coverImage || null,
+    isActive: h.isActive,
+    createdAt: h.createdAt,
+    ...extra,
   };
 }
 
 function booking(b) {
   return {
-    id: b.id,
+    id: String(b._id),
     reference: b.reference,
-    userId: b.user_id,
-    roomId: b.room_id,
-    hotelId: b.hotel_id,
-    checkIn: b.check_in,
-    checkOut: b.check_out,
+    userId: id(b.user),
+    roomId: id(b.room),
+    hotelId: id(b.hotel),
+    checkIn: b.checkIn,
+    checkOut: b.checkOut,
     guests: b.guests,
     nights: b.nights,
-    pricePerNight: b.price_per_night,
+    pricePerNight: b.pricePerNight,
     subtotal: b.subtotal,
     discount: b.discount,
     taxes: b.taxes,
-    totalPrice: b.total_price,
-    promoCode: b.promo_code,
+    totalPrice: b.totalPrice,
+    promoCode: b.promoCode || null,
     status: b.status,
-    paymentMethod: b.payment_method,
-    isPaid: b.is_paid,
-    isRefunded: b.is_refunded,
-    guestName: b.guest_name,
-    guestEmail: b.guest_email,
-    guestPhone: b.guest_phone,
-    specialRequests: b.special_requests,
-    hasReview: b.has_review ?? undefined,
-    cancelledAt: b.cancelled_at,
-    createdAt: b.created_at,
-    room: b.room_type !== undefined
-      ? { id: b.room_id, roomType: b.room_type, images: b.room_images }
-      : undefined,
-    hotel: b.hotel_name !== undefined
-      ? { id: b.hotel_id, name: b.hotel_name, city: b.hotel_city, address: b.hotel_address, contact: b.hotel_contact }
+    paymentMethod: b.paymentMethod,
+    isPaid: b.isPaid,
+    isRefunded: b.isRefunded,
+    guestName: b.guestName,
+    guestEmail: b.guestEmail,
+    guestPhone: b.guestPhone,
+    specialRequests: b.specialRequests,
+    hasReview: b.hasReview,
+    cancelledAt: b.cancelledAt || null,
+    createdAt: b.createdAt,
+    room: b.room && b.room._id ? { id: String(b.room._id), roomType: b.room.roomType, images: b.room.images } : undefined,
+    hotel: b.hotel && b.hotel._id
+      ? { id: String(b.hotel._id), name: b.hotel.name, city: b.hotel.city, address: b.hotel.address, contact: b.hotel.contact }
       : undefined,
   };
 }
 
 function review(r) {
   return {
-    id: r.id,
+    id: String(r._id),
     rating: r.rating,
     comment: r.comment,
-    createdAt: r.created_at,
-    user: { name: r.user_name, avatarUrl: r.user_avatar },
+    createdAt: r.createdAt,
+    user: { name: r.user?.name || 'Guest', avatarUrl: r.user?.avatarUrl || null },
   };
 }
 

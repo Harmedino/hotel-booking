@@ -1,22 +1,22 @@
 # QuickStay API
 
-Express + PostgreSQL API for the QuickStay hotel booking platform.
+Express + MongoDB (Mongoose) API for the QuickStay hotel booking platform.
 
 ## Run locally
 
 ```bash
 cd server
-cp .env.example .env      # point DATABASE_URL at a local Postgres
+cp .env.example .env      # set MONGODB_URI (Atlas, or a local replica set)
 npm install
-npm run dev               # migrates, seeds demo data on an empty DB, starts on :4000
-npm test                  # API tests (uses the quickstay_test database)
+npm run dev               # seeds demo data on an empty DB, starts on :4000
+npm test                  # API tests (uses the quickstay_test database; needs a replica set)
 ```
 
 Demo accounts (password `password123`): `guest@quickstay.app` and `owner@quickstay.app`.
 
 ## Structure
 
-- `db/migrations/*.sql` – schema, applied in order on boot (`npm run migrate`)
+- `models/index.js` – Mongoose schemas (indexes are synced on boot)
 - `db/seed.js` – demo hotels, rooms, bookings, reviews and promo codes
 - `lib/bookings.js` – availability, pricing and the booking lifecycle
 - `routes/` – HTTP endpoints
@@ -37,9 +37,11 @@ Demo accounts (password `password123`): `guest@quickstay.app` and `owner@quickst
 ## How bookings work
 
 - Prices are always computed on the server: nights × rate, minus promo, plus tax.
-- Each room type has `total_units`. A booking is accepted only while overlapping
-  active bookings are below that number. The room row is locked (`SELECT … FOR UPDATE`)
-  during the check, so two guests can't take the last unit at the same time.
+- Each room type has `totalUnits`. A booking is accepted only while overlapping
+  active bookings are below that number. The check runs in a MongoDB transaction
+  that first writes to the room document, so concurrent bookings for the same room
+  conflict and only one can take the last unit (covered by a test). This is why
+  `MONGODB_URI` must point at a replica set; Atlas clusters are replica sets.
 - Pay at hotel → `confirmed` immediately. Card → `pending`, holding the room for
   30 minutes until Stripe confirms payment (webhook or the success-page verify call).
 - Cancelling a paid card booking refunds it through Stripe.

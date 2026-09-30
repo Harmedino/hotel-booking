@@ -1,23 +1,21 @@
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
-const db = require('../db');
+const { User } = require('../models');
 const { unauthorized, forbidden } = require('./errors');
 
-const USER_COLUMNS = 'id, name, email, role, avatar_url, phone, created_at';
-
 function signToken(userId) {
-  return jwt.sign({ sub: userId }, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
+  return jwt.sign({ sub: String(userId) }, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
 }
 
 function serializeUser(u) {
   return {
-    id: u.id,
+    id: String(u._id),
     name: u.name,
     email: u.email,
     role: u.role,
-    avatarUrl: u.avatar_url,
-    phone: u.phone,
-    createdAt: u.created_at,
+    avatarUrl: u.avatarUrl || null,
+    phone: u.phone || '',
+    createdAt: u.createdAt,
   };
 }
 
@@ -27,7 +25,7 @@ async function loadUser(req) {
   if (!token) return null;
   try {
     const payload = jwt.verify(token, env.jwtSecret);
-    return await db.one(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [payload.sub]);
+    return await User.findById(payload.sub).select('-passwordHash -resetTokenHash');
   } catch {
     return null;
   }
@@ -57,4 +55,4 @@ function requireOwner(req, res, next) {
   next();
 }
 
-module.exports = { signToken, serializeUser, optionalAuth, requireAuth, requireOwner, USER_COLUMNS };
+module.exports = { signToken, serializeUser, optionalAuth, requireAuth, requireOwner };

@@ -1,5 +1,5 @@
 services:
-  # Backend API (Express + PostgreSQL). Frontend is hosted on Vercel.
+  # Backend API (Express + MongoDB). Frontend is hosted on Vercel.
   - type: web
     name: hotel-booking-api
     runtime: node
@@ -13,8 +13,8 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
-      - key: DATABASE_URL
-        sync: false # Postgres connection string, e.g. from Neon or Supabase
+      - key: MONGODB_URI
+        sync: false # MongoDB Atlas connection string (replica set, needed for transactions)
       - key: JWT_SECRET
         generateValue: true
       - key: CLIENT_URL

@@ -1,54 +1,71 @@
 const express = require('express');
-const db = require('../db');
+const mongoose = require('mongoose');
 const env = require('../config/env');
 const payments = require('../lib/payments');
+const { Hotel, Room, Booking, Review, PromoCode, Subscriber } = require('../models');
+const { todayIso } = require('../lib/pricing');
 const { validate, z } = require('../lib/validate');
 const { ah } = require('../lib/errors');
 
 const router = express.Router();
 
-router.get('/health', ah(async (req, res) => {
-  await db.query('SELECT 1');
-  res.json({ status: 'ok' });
-}));
+router.get('/health', (req, res) => {
+  const up = mongoose.connection.readyState === 1;
+  res.status(up ? 200 : 503).json({ status: up ? 'ok' : 'database unavailable' });
+});
 
 router.get('/config', (req, res) => {
   res.json({ stripeEnabled: payments.isEnabled(), currency: env.currency, taxRate: env.taxRate, holdMinutes: env.holdMinutes });
 });
 
 router.get('/stats', ah(async (req, res) => {
-  const s = await db.one(`SELECT
-    (SELECT COUNT(*) FROM hotels WHERE is_active)::int AS hotels,
-    (SELECT COUNT(*) FROM rooms r JOIN hotels h ON h.id = r.hotel_id WHERE h.is_active AND r.is_available)::int AS rooms,
-    (SELECT COUNT(DISTINCT lower(city)) FROM hotels WHERE is_active)::int AS cities,
-    (SELECT COUNT(*) FROM bookings WHERE status <> 'cancelled')::int AS bookings,
-    (SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0) FROM reviews) AS avg_rating`);
-  res.json({ hotels: s.hotels, rooms: s.rooms, cities: s.cities, bookings: s.bookings, avgRating: s.avg_rating });
+  const hotels = await Hotel.find({ isActive: true }).select('city');
+  const [rooms, bookings, rating] = await Promise.all([
+    Room.countDocuments({ isAvailable: true, hotel: { $in: hotels.map((h) => h._id) } }),
+    Booking.countDocuments({ status: { $ne: 'cancelled' } }),
+    Review.aggregate([{ $group: { _id: null, avg: { $avg: '$rating' } } }]),
+  ]);
+  res.json({
+    hotels: hotels.length,
+    rooms,
+    cities: new Set(hotels.map((h) => h.city.toLowerCase())).size,
+    bookings,
+    avgRating: rating[0] ? Math.round(rating[0].avg * 10) / 10 : 0,
+  });
 }));
 
 router.get('/cities', ah(async (req, res) => {
-  const rows = await db.many(`
-    SELECT h.city, MIN(h.country) AS country, COUNT(DISTINCT h.id)::int AS hotels, COUNT(r.id)::int AS rooms,
-      MIN(r.price_per_night) AS from_price,
-      (ARRAY_AGG(r.images[1] ORDER BY r.created_at) FILTER (WHERE r.images[1] IS NOT NULL))[1] AS image
-    FROM hotels h JOIN rooms r ON r.hotel_id = h.id AND r.is_available
-    WHERE h.is_active
-    GROUP BY h.city ORDER BY COUNT(r.id) DESC, h.city LIMIT 12`);
-  res.json(rows.map((r) => ({
-    city: r.city, country: r.country, hotels: r.hotels, rooms: r.rooms, fromPrice: r.from_price, image: r.image,
-  })));
+  const hotels = await Hotel.find({ isActive: true }).select('city country');
+  const rooms = await Room.find({ isAvailable: true, hotel: { $in: hotels.map((h) => h._id) } })
+    .select('hotel pricePerNight images createdAt')
+    .sort({ createdAt: 1 });
+  const byHotel = new Map(hotels.map((h) => [String(h._id), h]));
+  const cities = new Map();
+  for (const r of rooms) {
+    const h = byHotel.get(String(r.hotel));
+    const c = cities.get(h.city) || { city: h.city, country: h.country, hotels: new Set(), rooms: 0, fromPrice: Infinity, image: null };
+    c.hotels.add(String(h._id));
+    c.rooms += 1;
+    c.fromPrice = Math.min(c.fromPrice, r.pricePerNight);
+    c.image = c.image || r.images[0] || null;
+    cities.set(h.city, c);
+  }
+  const list = [...cities.values()]
+    .map((c) => ({ ...c, hotels: c.hotels.size }))
+    .sort((a, b) => b.rooms - a.rooms || a.city.localeCompare(b.city))
+    .slice(0, 12);
+  res.json(list);
 }));
 
 router.get('/offers', ah(async (req, res) => {
-  const rows = await db.many(`SELECT * FROM promo_codes
-    WHERE is_active AND (expires_at IS NULL OR expires_at >= CURRENT_DATE) ORDER BY percent_off DESC`);
-  res.json(rows.map((p) => ({
-    code: p.code, title: p.title, description: p.description, percentOff: p.percent_off, image: p.image, expiresAt: p.expires_at,
+  const promos = await PromoCode.find({ isActive: true, $or: [{ expiresAt: null }, { expiresAt: { $gte: todayIso() } }] }).sort({ percentOff: -1 });
+  res.json(promos.map((p) => ({
+    code: p.code, title: p.title, description: p.description, percentOff: p.percentOff, image: p.image, expiresAt: p.expiresAt,
   })));
 }));
 
 router.post('/newsletter', validate(z.object({ email: z.string().trim().toLowerCase().email('must be a valid email') })), ah(async (req, res) => {
-  await db.query('INSERT INTO subscribers (email) VALUES ($1) ON CONFLICT DO NOTHING', [req.body.email]);
+  await Subscriber.updateOne({ email: req.body.email }, { $setOnInsert: { email: req.body.email } }, { upsert: true });
   res.status(201).json({ ok: true });
 }));
 

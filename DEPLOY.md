@@ -2,14 +2,18 @@
 
 Repo: https://github.com/Harmedino/hotel-booking
 
-- **Database** → PostgreSQL (Neon or Supabase free tier)
+- **Database** → MongoDB Atlas (free M0 cluster)
 - **Backend** (`server/`) → Render
 - **Frontend** (`client/`) → Vercel
 
 ## 1. Database
-Create a free Postgres database on [Neon](https://neon.tech) and copy the connection
-string (`postgres://…?sslmode=require`). Tables and demo data are created
-automatically the first time the API starts.
+Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas), then:
+- **Database Access** → add a user with a password.
+- **Network Access** → allow `0.0.0.0/0` (Render's IPs aren't fixed).
+- **Connect → Drivers** → copy the `mongodb+srv://…` string, put your password in, and add
+  the database name before the `?`, e.g. `…mongodb.net/quickstay?retryWrites=true&w=majority`.
+
+Collections, indexes and demo data are created automatically the first time the API starts.
 
 ## 2. Backend on Render
 **New → Web Service** → pick `Harmedino/hotel-booking`:
@@ -29,7 +33,7 @@ Environment variables:
 |---|---|
 | `NODE_VERSION` | `22` |
 | `NODE_ENV` | `production` |
-| `DATABASE_URL` | Neon connection string |
+| `MONGODB_URI` | Atlas connection string |
 | `JWT_SECRET` | long random string (`openssl rand -hex 32`) |
 | `CLIENT_URL` | Vercel URL, no trailing slash (add after step 3) |
 | `APP_URL` | same as `CLIENT_URL` |

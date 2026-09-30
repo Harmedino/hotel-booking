@@ -1,26 +1,21 @@
 const express = require('express');
-const db = require('../db');
-const { validate, z, isoDate, uuid } = require('../lib/validate');
+const { Booking } = require('../models');
+const { validate, z, isoDate, objectId } = require('../lib/validate');
 const { ah, notFound, forbidden, badRequest } = require('../lib/errors');
 const { requireAuth } = require('../lib/auth');
 const { createBooking, cancelBooking, startCheckout } = require('../lib/bookings');
 const payments = require('../lib/payments');
+const env = require('../config/env');
 const { todayIso } = require('../lib/pricing');
 const serialize = require('../lib/serializers');
 
 const router = express.Router();
 router.use(requireAuth);
 
-const BOOKING_SELECT = `
-  SELECT b.*, r.room_type, r.images AS room_images, h.name AS hotel_name, h.city AS hotel_city,
-    h.address AS hotel_address, h.contact AS hotel_contact, h.owner_id AS hotel_owner_id,
-    EXISTS (SELECT 1 FROM reviews rv WHERE rv.booking_id = b.id) AS has_review
-  FROM bookings b
-  JOIN rooms r ON r.id = b.room_id
-  JOIN hotels h ON h.id = b.hotel_id`;
+const withDetails = (q) => q.populate('room', 'roomType images').populate('hotel', 'name city address contact owner');
 
 const createSchema = z.object({
-  roomId: uuid,
+  roomId: objectId,
   checkIn: isoDate,
   checkOut: isoDate,
   guests: z.number().int().min(1).max(20),
@@ -38,47 +33,41 @@ router.post('/', validate(createSchema), ah(async (req, res) => {
 }));
 
 router.get('/mine', ah(async (req, res) => {
-  const rows = await db.many(`${BOOKING_SELECT} WHERE b.user_id = $1 ORDER BY b.check_in DESC, b.created_at DESC`, [
-    req.user.id,
-  ]);
+  const rows = await withDetails(Booking.find({ user: req.user._id }).sort({ checkIn: -1, createdAt: -1 }));
   res.json(rows.map(serialize.booking));
 }));
 
-async function loadOwnBooking(req) {
-  const row = await db.one(`${BOOKING_SELECT} WHERE b.id = $1`, [req.params.id]);
-  if (!row) throw notFound('Booking not found');
-  if (row.user_id !== req.user.id && row.hotel_owner_id !== req.user.id) throw forbidden();
-  return row;
+// Guests see their own bookings; hotel owners see bookings at their hotels.
+async function loadBooking(req) {
+  const b = await withDetails(Booking.findById(req.params.id));
+  if (!b) throw notFound('Booking not found');
+  const mine = String(b.user) === String(req.user._id);
+  if (!mine && String(b.hotel.owner) !== String(req.user._id)) throw forbidden();
+  return { b, mine };
 }
 
 router.get('/:id', ah(async (req, res) => {
-  res.json(serialize.booking(await loadOwnBooking(req)));
+  res.json(serialize.booking((await loadBooking(req)).b));
 }));
 
 router.post('/:id/cancel', ah(async (req, res) => {
-  const row = await loadOwnBooking(req);
-  if (row.user_id !== req.user.id) throw forbidden();
-  if (row.check_in <= todayIso()) throw badRequest('Bookings can only be cancelled before the check-in date');
-  const updated = await cancelBooking(row);
-  res.json(serialize.booking({ ...row, ...updated }));
+  const { b, mine } = await loadBooking(req);
+  if (!mine) throw forbidden();
+  if (b.checkIn <= todayIso()) throw badRequest('Bookings can only be cancelled before the check-in date');
+  res.json(serialize.booking(await cancelBooking(b)));
 }));
 
 // Retry payment for an unpaid online booking whose checkout was abandoned.
 router.post('/:id/pay', ah(async (req, res) => {
-  const row = await loadOwnBooking(req);
-  if (row.user_id !== req.user.id) throw forbidden();
+  const { b, mine } = await loadBooking(req);
+  if (!mine) throw forbidden();
   if (!payments.isEnabled()) throw badRequest('Online payment is not available right now');
-  if (row.is_paid) throw badRequest('This booking is already paid');
-  if (row.status === 'cancelled') throw badRequest('This booking was cancelled');
-  if (row.payment_method === 'stripe' && row.status === 'pending') {
-    const fresh = await db.one(
-      `SELECT created_at > now() - interval '30 minutes' AS held FROM bookings WHERE id = $1`,
-      [row.id]
-    );
-    if (!fresh.held) throw badRequest('This reservation hold has expired. Please book again.');
+  if (b.isPaid) throw badRequest('This booking is already paid');
+  if (b.status === 'cancelled') throw badRequest('This booking was cancelled');
+  if (b.status === 'pending' && b.createdAt < new Date(Date.now() - env.holdMinutes * 60 * 1000)) {
+    throw badRequest('This reservation hold has expired. Please book again.');
   }
-  const checkoutUrl = await startCheckout(row, row.room_type, row.hotel_name);
-  res.json({ checkoutUrl });
+  res.json({ checkoutUrl: await startCheckout(b, b.room.roomType, b.hotel.name) });
 }));
 
 module.exports = router;

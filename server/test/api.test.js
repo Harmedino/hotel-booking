@@ -3,8 +3,8 @@ process.env.NODE_ENV = 'test';
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
-const db = require('../db');
-const migrate = require('../db/migrate');
+const mongoose = require('mongoose');
+const { connect, disconnect } = require('../db/connect');
 const { seed } = require('../db/seed');
 const app = require('../app');
 
@@ -20,14 +20,16 @@ let guestToken;
 let ownerToken;
 
 before(async () => {
-  await db.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-  await migrate();
+  await connect();
+  await mongoose.connection.dropDatabase();
+  await connect();
+  await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes()));
   await seed();
   guestToken = (await api.post('/api/auth/login').send({ email: 'guest@quickstay.app', password: 'password123' })).body.token;
   ownerToken = (await api.post('/api/auth/login').send({ email: 'owner@quickstay.app', password: 'password123' })).body.token;
 });
 
-after(() => db.pool.end());
+after(() => disconnect());
 
 test('register, login and profile', async () => {
   const reg = await api.post('/api/auth/register').send({ name: 'Ada', email: 'Ada@Example.com', password: 'secret123' });
@@ -166,5 +168,19 @@ test('wishlist and newsletter', async () => {
 
   assert.equal((await api.post('/api/newsletter').send({ email: 'x@y.com' })).status, 201);
   assert.equal((await api.post('/api/newsletter').send({ email: 'nope' })).status, 400);
-  assert.equal((await api.get('/api/rooms/not-a-uuid')).status, 404);
+  assert.equal((await api.get('/api/rooms/not-an-id')).status, 404);
+});
+
+test('race: five simultaneous bookings for the last unit, exactly one wins', async () => {
+  const hotels = await api.get('/api/owner/hotels').set(auth(ownerToken));
+  const room = await api.post('/api/owner/rooms').set(auth(ownerToken)).send({
+    hotelId: hotels.body[0].id, roomType: 'Last Room', pricePerNight: 50, totalUnits: 1, images: ['/static/seed/roomImg2.png'],
+  });
+  const body = {
+    roomId: room.body.id, checkIn: day(40), checkOut: day(42), guests: 1, paymentMethod: 'pay_at_hotel',
+    guestName: 'Racer', guestEmail: 'race@example.com',
+  };
+  const results = await Promise.all(Array.from({ length: 5 }, () => api.post('/api/bookings').set(auth(guestToken)).send(body)));
+  const statuses = results.map((r) => r.status).sort();
+  assert.deepEqual(statuses, [201, 409, 409, 409, 409]);
 });

@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const db = require('./index');
+const { User, Hotel, Room, Booking, Review, PromoCode } = require('../models');
 const { quote } = require('../lib/pricing');
 
 const img = (n) => `/static/seed/roomImg${n}.png`;
@@ -61,96 +61,84 @@ const addDays = (n) => {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 };
+const daysAgo = (n) => new Date(Date.now() - n * 86400000);
 
 async function seed() {
-  await db.tx(async (c) => {
-    const hash = await bcrypt.hash('password123', 10);
-    const users = await c.query(
-      `INSERT INTO users (name, email, password_hash, role) VALUES
-        ('Olivia Owner', 'owner@quickstay.app', $1, 'owner'),
-        ('Gabriel Guest', 'guest@quickstay.app', $1, 'guest'),
-        ('Emma Rodriguez', 'emma@example.com', $1, 'guest'),
-        ('Liam Johnson', 'liam@example.com', $1, 'guest'),
-        ('Sophia Lee', 'sophia@example.com', $1, 'guest')
-       RETURNING id, name, email`,
-      [hash]
-    );
-    const [owner, guest, ...others] = users.rows;
-    const reviewers = [guest, ...others];
+  const passwordHash = await bcrypt.hash('password123', 10);
+  const [owner, guest, ...others] = await User.insertMany([
+    { name: 'Olivia Owner', email: 'owner@quickstay.app', passwordHash, role: 'owner' },
+    { name: 'Gabriel Guest', email: 'guest@quickstay.app', passwordHash },
+    { name: 'Emma Rodriguez', email: 'emma@example.com', passwordHash },
+    { name: 'Liam Johnson', email: 'liam@example.com', passwordHash },
+    { name: 'Sophia Lee', email: 'sophia@example.com', passwordHash },
+  ]);
+  const reviewers = [guest, ...others];
 
-    for (const p of PROMOS) {
-      await c.query(
-        `INSERT INTO promo_codes (code, title, description, percent_off, image, expires_at) VALUES ($1,$2,$3,$4,$5,$6)`,
-        [p.code, p.title, p.description, p.percent, p.image, addDays(120)]
-      );
-    }
+  await PromoCode.insertMany(
+    PROMOS.map((p) => ({ code: p.code, title: p.title, description: p.description, percentOff: p.percent, image: p.image, expiresAt: addDays(120) }))
+  );
 
-    let n = 0;
-    for (const [hi, h] of HOTELS.entries()) {
-      const { rows } = await c.query(
-        `INSERT INTO hotels (owner_id, name, description, address, city, country, contact, cover_image, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now() - ($9 || ' days')::interval) RETURNING id`,
-        [owner.id, h.name, h.description, h.address, h.city, h.country, h.contact, img((hi % 4) + 1), 120 - hi]
-      );
-      const hotelId = rows[0].id;
-      // Each hotel gets 2-3 room types.
-      const templates = ROOM_TEMPLATES.filter((_, i) => (i + hi) % 4 !== 3);
-      for (const t of templates) {
-        n += 1;
-        const price = Math.round(t.price * (CITY_PRICE[h.city] || 1));
-        const room = await c.query(
-          `INSERT INTO rooms (hotel_id, room_type, description, price_per_night, max_guests, total_units, amenities, images, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now() - ($9 || ' days')::interval) RETURNING id`,
-          [hotelId, t.roomType, DESCRIPTIONS[t.roomType], price, t.maxGuests, t.units, t.amenities, rotate(n), 100 - n]
-        );
-        const roomId = room.rows[0].id;
+  let n = 0;
+  for (const [hi, h] of HOTELS.entries()) {
+    const hotel = await Hotel.create({ ...h, owner: owner._id, coverImage: img((hi % 4) + 1), createdAt: daysAgo(120 - hi) });
+    // Each hotel gets 3 of the 4 room types.
+    const templates = ROOM_TEMPLATES.filter((_, i) => (i + hi) % 4 !== 3);
+    for (const t of templates) {
+      n += 1;
+      const price = Math.round(t.price * (CITY_PRICE[h.city] || 1));
+      const room = await Room.create({
+        hotel: hotel._id, roomType: t.roomType, description: DESCRIPTIONS[t.roomType], pricePerNight: price,
+        maxGuests: t.maxGuests, totalUnits: t.units, amenities: t.amenities, images: rotate(n), createdAt: daysAgo(100 - n),
+      });
 
-        // Past stays with reviews, plus recent and upcoming bookings for the dashboard.
-        const stays = [
-          { offset: -40 - (n % 20), nights: 2, status: 'completed', review: true },
-          { offset: -15 - (n % 10), nights: 3, status: 'completed', review: n % 2 === 0 },
-          { offset: 5 + (n % 20), nights: 2, status: 'confirmed', review: false },
-        ];
-        for (const [si, s] of stays.entries()) {
-          const u = reviewers[(n + si) % reviewers.length];
-          const pq = quote({ pricePerNight: price, nights: s.nights });
-          const createdOffset = Math.min(s.offset - 3 - (n % 7), -1);
-          const b = await c.query(
-            `INSERT INTO bookings (reference, user_id, room_id, hotel_id, check_in, check_out, guests, nights, price_per_night,
-               subtotal, taxes, total_price, status, payment_method, is_paid, guest_name, guest_email, created_at)
-             VALUES ($1,$2,$3,$4,$5,$6,1,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, now() + ($17 || ' days')::interval) RETURNING id`,
-            [
-              `QS-S${String(n).padStart(3, '0')}${si}`, u.id, roomId, hotelId, addDays(s.offset), addDays(s.offset + s.nights),
-              s.nights, price, pq.subtotal, pq.taxes, pq.total, s.status, si % 2 ? 'stripe' : 'pay_at_hotel',
-              s.status === 'completed' || si % 2 === 1, u.name, u.email, createdOffset,
-            ]
-          );
-          if (s.review) {
-            const [rating, comment] = REVIEWS[(n + si) % REVIEWS.length];
-            await c.query(
-              `INSERT INTO reviews (booking_id, room_id, hotel_id, user_id, rating, comment, created_at)
-               VALUES ($1,$2,$3,$4,$5,$6, now() + ($7 || ' days')::interval)`,
-              [b.rows[0].id, roomId, hotelId, u.id, rating, comment, s.offset + s.nights + 1]
-            );
-          }
+      // Past stays with reviews, plus upcoming bookings for the dashboard.
+      const stays = [
+        { offset: -40 - (n % 20), nights: 2, status: 'completed', review: true },
+        { offset: -15 - (n % 10), nights: 3, status: 'completed', review: n % 2 === 0 },
+        { offset: 5 + (n % 20), nights: 2, status: 'confirmed', review: false },
+      ];
+      const ratings = [];
+      for (const [si, s] of stays.entries()) {
+        const u = reviewers[(n + si) % reviewers.length];
+        const pq = quote({ pricePerNight: price, nights: s.nights });
+        const booking = await Booking.create({
+          reference: `QS-S${String(n).padStart(3, '0')}${si}`, user: u._id, room: room._id, hotel: hotel._id,
+          checkIn: addDays(s.offset), checkOut: addDays(s.offset + s.nights), guests: 1, nights: s.nights,
+          pricePerNight: price, subtotal: pq.subtotal, taxes: pq.taxes, totalPrice: pq.total, status: s.status,
+          paymentMethod: si % 2 ? 'stripe' : 'pay_at_hotel', isPaid: s.status === 'completed' || si % 2 === 1,
+          guestName: u.name, guestEmail: u.email, hasReview: s.review,
+          createdAt: daysAgo(Math.max(-(s.offset - 3 - (n % 7)), 1)),
+        });
+        if (s.review) {
+          const [rating, comment] = REVIEWS[(n + si) % REVIEWS.length];
+          ratings.push(rating);
+          await Review.create({
+            booking: booking._id, room: room._id, hotel: hotel._id, user: u._id, rating, comment,
+            createdAt: daysAgo(-(s.offset + s.nights + 1)),
+          });
         }
       }
+      if (ratings.length) {
+        room.ratingAvg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+        room.reviewCount = ratings.length;
+        await room.save();
+      }
     }
-  });
+  }
   console.log('Seeded demo data. Owner: owner@quickstay.app / Guest: guest@quickstay.app (password123)');
 }
 
 async function seedIfEmpty() {
-  const row = await db.one('SELECT COUNT(*)::int AS n FROM users');
-  if (row.n === 0) await seed();
+  if ((await User.estimatedDocumentCount()) === 0) await seed();
 }
 
 module.exports = { seed, seedIfEmpty };
 
 if (require.main === module) {
-  require('./migrate')()
+  const { connect, disconnect } = require('./connect');
+  connect()
     .then(seedIfEmpty)
-    .then(() => db.pool.end())
+    .then(disconnect)
     .catch((err) => {
       console.error(err);
       process.exit(1);
