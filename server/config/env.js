@@ -17,6 +17,11 @@ const stripSlash = (url) => url.replace(/\/+$/, '');
 const isOrigin = (url) => /^https?:\/\/[^/\s]+$/.test(url);
 const isLocal = (url) => /localhost|127\.0\.0\.1/.test(url);
 
+// The deployed frontend. Always allowed in production so a missing or
+// localhost CLIENT_URL can't block sign-up from the real site.
+const DEFAULT_APP_URL = 'https://hotel-booking-eosin-nu.vercel.app';
+const DEFAULT_PREVIEW_ORIGINS = 'https://hotel-booking-*.vercel.app';
+
 // ---- MongoDB -----------------------------------------------------------
 // Must be a replica set (every MongoDB Atlas cluster is): bookings use transactions.
 let mongoUri = (isTest && read('MONGODB_URI_TEST')) || read('MONGODB_URI');
@@ -29,11 +34,14 @@ if (!mongoUri) {
 
 // ---- Auth --------------------------------------------------------------
 let jwtSecret = read('JWT_SECRET');
-if (isProd) {
-  if (!jwtSecret) problems.push('JWT_SECRET is required. Generate one with: openssl rand -hex 32');
-  else if (jwtSecret.length < 32 || ['change-me', 'changeme', 'secret'].includes(jwtSecret)) {
-    problems.push('JWT_SECRET is too weak: use at least 32 random characters (openssl rand -hex 32)');
-  }
+if (isProd && (!jwtSecret || jwtSecret.length < 32 || ['change-me', 'changeme', 'secret'].includes(jwtSecret))) {
+  // Don't refuse to start: derive a stable secret from the (secret) database URI so
+  // logins survive restarts, and warn loudly so a real one gets set.
+  warnings.push(
+    `JWT_SECRET is ${jwtSecret ? 'too weak' : 'not set'}; using a secret derived from MONGODB_URI. ` +
+      'Set JWT_SECRET to 32+ random characters (openssl rand -hex 32) on Render.'
+  );
+  jwtSecret = mongoUri ? require('crypto').createHash('sha256').update(`jwt:${mongoUri}`).digest('hex') : jwtSecret;
 } else if (!jwtSecret) {
   jwtSecret = 'dev-only-insecure-secret';
 }
@@ -46,11 +54,10 @@ const badOrigins = clientOrigins.filter((o) => !isOrigin(o));
 if (badOrigins.length) {
   problems.push(`CLIENT_URL has invalid entries (${badOrigins.join(', ')}); use full origins like https://your-app.vercel.app`);
 }
-if (isProd && !clientOrigins.length) {
-  problems.push('CLIENT_URL is required: your Vercel URL, e.g. https://hotel-booking-eosin-nu.vercel.app');
-} else if (isProd && clientOrigins.every(isLocal)) {
-  problems.push(`CLIENT_URL only allows ${clientOrigins.join(', ')}; set it to your Vercel URL so the deployed site can call the API`);
+if (isProd && (!clientOrigins.length || clientOrigins.every(isLocal))) {
+  warnings.push(`CLIENT_URL is ${clientOrigins.length ? clientOrigins.join(', ') : 'not set'}; allowing ${DEFAULT_APP_URL}. Set CLIENT_URL on Render if the site moves.`);
 }
+if (isProd) clientOrigins.push(DEFAULT_APP_URL, DEFAULT_PREVIEW_ORIGINS);
 if (!isProd) clientOrigins.push('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173');
 
 const corsOrigins = [...new Set(clientOrigins)].map((o) =>
@@ -60,10 +67,11 @@ const corsOrigins = [...new Set(clientOrigins)].map((o) =>
 );
 
 // APP_URL: public frontend URL for links in emails and Stripe redirects.
-const appUrl = stripSlash(read('APP_URL') || clientOrigins.find((o) => !o.includes('*')) || 'http://localhost:5173');
-if (!isOrigin(appUrl) && !/^https?:\/\/[^\s]+$/.test(appUrl)) problems.push('APP_URL must be a full URL like https://your-app.vercel.app');
+let appUrl = stripSlash(read('APP_URL') || clientOrigins.find((o) => !o.includes('*') && !(isProd && isLocal(o))) || 'http://localhost:5173');
+if (!/^https?:\/\/[^\s]+$/.test(appUrl)) problems.push('APP_URL must be a full URL like https://your-app.vercel.app');
 if (isProd && isLocal(appUrl)) {
-  problems.push(`APP_URL points at ${appUrl}; set it to your Vercel URL so emails and payment redirects work`);
+  warnings.push(`APP_URL points at ${appUrl}; using ${DEFAULT_APP_URL} for email links and payment redirects.`);
+  appUrl = DEFAULT_APP_URL;
 }
 
 // ---- Optional integrations ---------------------------------------------

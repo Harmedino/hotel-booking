@@ -4,6 +4,7 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import MobileTabBar from './components/layout/MobileTabBar';
 import { PageLoader } from './components/layout/PageLoader';
+import ServerStatus from './components/ServerStatus';
 import { RequireAuth, RequireOwner, GuestOnly } from './components/layout/Guards';
 import { useTheme } from './hooks/useTheme';
 import Home from './pages/Home';
@@ -58,6 +59,7 @@ export default function App() {
   return (
     <div className="min-h-dvh bg-bg text-ink">
       <ScrollAndTitle />
+      <ServerStatus />
       {!isOwnerArea && <Navbar theme={theme} toggleTheme={toggle} />}
       <main className="min-h-[70vh]">
         <Suspense fallback={<PageLoader />}>
