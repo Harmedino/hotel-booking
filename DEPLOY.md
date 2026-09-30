@@ -52,7 +52,8 @@ Check `<render-url>/api/health` returns `{"status":"ok"}`.
 ## 3. Frontend on Vercel
 **Add New → Project** → import `Harmedino/hotel-booking`, Framework **Vite**, Root Directory `client`.
 
-Environment variable: `VITE_API_URL` = your Render URL (no trailing slash).
+`client/.env.production` points production builds at `https://hotel-booking-8mlp.onrender.com`.
+Setting `VITE_API_URL` in Vercel overrides it (no trailing slash).
 
 ## 4. Connect them
 Set `CLIENT_URL` and `APP_URL` on Render to the Vercel URL and save (Render redeploys).

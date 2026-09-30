@@ -12,6 +12,8 @@ npm-debug.log*
 .env
 .env.*
 !.env.example
+# Public, non-secret build config (the production API URL).
+!client/.env.production
 
 # Build outputs
 dist/
