@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js --watch ./ --ignore test/",
+    "build": "echo \"No build step for the API\"",
     "start": "node index.js",
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
