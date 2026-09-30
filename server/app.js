@@ -13,7 +13,8 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors(env.clientOrigins.length ? { origin: env.clientOrigins } : undefined));
+// Auth uses a Bearer token (no cookies), so only the origin allow-list matters.
+app.use(cors({ origin: env.corsOrigins }));
 app.use(compression());
 if (!env.isTest) app.use(logger);
 

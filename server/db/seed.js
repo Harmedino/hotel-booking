@@ -128,8 +128,18 @@ async function seed() {
   console.log('Seeded demo data. Owner: owner@quickstay.app / Guest: guest@quickstay.app (password123)');
 }
 
+// Only ever seeds a completely empty database: never adds to or overwrites real data.
 async function seedIfEmpty() {
-  if ((await User.estimatedDocumentCount()) === 0) await seed();
+  const counts = await Promise.all([User, Hotel, Room, Booking].map((m) => m.estimatedDocumentCount()));
+  if (counts.some((n) => n > 0)) return false;
+  try {
+    await seed();
+    return true;
+  } catch (err) {
+    // Another instance seeded at the same moment (unique email index): not an error.
+    if (err.code === 11000) return false;
+    throw err;
+  }
 }
 
 module.exports = { seed, seedIfEmpty };

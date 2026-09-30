@@ -1,48 +1,116 @@
 require('dotenv').config({ quiet: true });
 
-const isProd = process.env.NODE_ENV === 'production';
+// Render sets RENDER=true on every service; treat it as production for the
+// required-variable checks so a missing NODE_ENV can't fall back to dev defaults.
+const isProd = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
 const isTest = process.env.NODE_ENV === 'test';
 
-// CLIENT_URL: comma-separated allowed origins. Unset = allow all (local dev).
-const clientOrigins = (process.env.CLIENT_URL || '')
-  .split(',')
-  .map((o) => o.trim().replace(/\/$/, ''))
-  .filter(Boolean);
+// Empty dashboard values (e.g. `STRIPE_SECRET_KEY=`) count as unset.
+const read = (key) => {
+  const value = process.env[key];
+  return value === undefined || value.trim() === '' ? undefined : value.trim();
+};
+
+const problems = [];
+const warnings = [];
+const stripSlash = (url) => url.replace(/\/+$/, '');
+const isOrigin = (url) => /^https?:\/\/[^/\s]+$/.test(url);
+const isLocal = (url) => /localhost|127\.0\.0\.1/.test(url);
+
+// ---- MongoDB -----------------------------------------------------------
+// Must be a replica set (every MongoDB Atlas cluster is): bookings use transactions.
+let mongoUri = (isTest && read('MONGODB_URI_TEST')) || read('MONGODB_URI');
+if (!mongoUri) {
+  if (isProd) problems.push('MONGODB_URI is required (your MongoDB Atlas connection string, e.g. ...mongodb.net/quickstay?retryWrites=true&w=majority)');
+  else mongoUri = `mongodb://127.0.0.1:27017/${isTest ? 'quickstay_test' : 'quickstay'}?replicaSet=rs0`;
+} else if (!/^mongodb(\+srv)?:\/\//.test(mongoUri)) {
+  problems.push('MONGODB_URI must start with mongodb:// or mongodb+srv://');
+}
+
+// ---- Auth --------------------------------------------------------------
+let jwtSecret = read('JWT_SECRET');
+if (isProd) {
+  if (!jwtSecret) problems.push('JWT_SECRET is required. Generate one with: openssl rand -hex 32');
+  else if (jwtSecret.length < 32 || ['change-me', 'changeme', 'secret'].includes(jwtSecret)) {
+    problems.push('JWT_SECRET is too weak: use at least 32 random characters (openssl rand -hex 32)');
+  }
+} else if (!jwtSecret) {
+  jwtSecret = 'dev-only-insecure-secret';
+}
+
+// ---- Frontend URLs -----------------------------------------------------
+// CLIENT_URL: comma-separated origins allowed to call the API. A "*" wildcard
+// is allowed, e.g. https://hotel-booking-*.vercel.app for Vercel previews.
+const clientOrigins = (read('CLIENT_URL') || '').split(',').map((o) => stripSlash(o.trim())).filter(Boolean);
+const badOrigins = clientOrigins.filter((o) => !isOrigin(o));
+if (badOrigins.length) {
+  problems.push(`CLIENT_URL has invalid entries (${badOrigins.join(', ')}); use full origins like https://your-app.vercel.app`);
+}
+if (isProd && !clientOrigins.length) {
+  problems.push('CLIENT_URL is required: your Vercel URL, e.g. https://hotel-booking-eosin-nu.vercel.app');
+}
+if (!isProd) clientOrigins.push('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173');
+
+const corsOrigins = [...new Set(clientOrigins)].map((o) =>
+  o.includes('*')
+    ? new RegExp(`^${o.split('*').map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[a-z0-9-]+')}$`)
+    : o
+);
+
+// APP_URL: public frontend URL for links in emails and Stripe redirects.
+const appUrl = stripSlash(read('APP_URL') || clientOrigins.find((o) => !o.includes('*')) || 'http://localhost:5173');
+if (!isOrigin(appUrl) && !/^https?:\/\/[^\s]+$/.test(appUrl)) problems.push('APP_URL must be a full URL like https://your-app.vercel.app');
+if (isProd && isLocal(appUrl)) {
+  problems.push(`APP_URL points at ${appUrl}; set it to your Vercel URL so emails and payment redirects work`);
+}
+
+// ---- Optional integrations ---------------------------------------------
+const stripeSecretKey = read('STRIPE_SECRET_KEY') || '';
+const stripeWebhookSecret = read('STRIPE_WEBHOOK_SECRET') || '';
+if (stripeSecretKey && !/^sk_(test|live)_/.test(stripeSecretKey)) problems.push('STRIPE_SECRET_KEY should start with sk_test_ or sk_live_');
+if (stripeSecretKey && !stripeWebhookSecret) {
+  warnings.push('STRIPE_WEBHOOK_SECRET is not set: payments still confirm when guests return from Stripe, but not if they close the tab first.');
+}
+
+const smtpHost = read('SMTP_HOST') || '';
+if (smtpHost && (!read('SMTP_USER') || !read('SMTP_PASS'))) {
+  warnings.push('SMTP_HOST is set without SMTP_USER/SMTP_PASS: most providers will reject unauthenticated mail.');
+}
+
+const taxRate = read('TAX_RATE') !== undefined ? Number(read('TAX_RATE')) : 0.1;
+if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1) problems.push('TAX_RATE must be a number between 0 and 1 (0.1 = 10%)');
+
+if (problems.length) {
+  const message = `Invalid environment configuration${isProd ? ' (production)' : ''}:\n${problems.map((p) => `  - ${p}`).join('\n')}\nSet these in Render → Environment, or in server/.env locally.`;
+  throw new Error(message);
+}
+if (!isTest) warnings.forEach((w) => console.warn(`Warning: ${w}`));
 
 const env = {
   isProd,
   isTest,
-  port: Number(process.env.PORT) || 4000,
-  // Must be a replica set (e.g. MongoDB Atlas): bookings use transactions.
-  mongoUri:
-    (isTest && process.env.MONGODB_URI_TEST) ||
-    process.env.MONGODB_URI ||
-    (isTest
-      ? 'mongodb://127.0.0.1:27017/quickstay_test?replicaSet=rs0'
-      : 'mongodb://127.0.0.1:27017/quickstay?replicaSet=rs0'),
-  jwtSecret: process.env.JWT_SECRET || (isProd ? null : 'dev-only-insecure-secret'),
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  clientOrigins,
-  // Public URL of the frontend, used in emails and Stripe redirects.
-  appUrl: (process.env.APP_URL || clientOrigins[0] || 'http://localhost:5173').replace(/\/$/, ''),
-  currency: (process.env.CURRENCY || 'usd').toLowerCase(),
-  taxRate: process.env.TAX_RATE !== undefined ? Number(process.env.TAX_RATE) : 0.1,
+  port: Number(read('PORT')) || 4000,
+  mongoUri,
+  jwtSecret,
+  jwtExpiresIn: read('JWT_EXPIRES_IN') || '7d',
+  corsOrigins,
+  appUrl,
+  currency: (read('CURRENCY') || 'usd').toLowerCase(),
+  taxRate,
   // Minutes an unpaid online-payment booking holds inventory.
   holdMinutes: 30,
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  stripeSecretKey,
+  stripeWebhookSecret,
   smtp: {
-    host: process.env.SMTP_HOST || '',
-    port: Number(process.env.SMTP_PORT) || 587,
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
+    host: smtpHost,
+    port: Number(read('SMTP_PORT')) || 587,
+    user: read('SMTP_USER') || '',
+    pass: read('SMTP_PASS') || '',
   },
-  mailFrom: process.env.MAIL_FROM || 'QuickStay <no-reply@quickstay.app>',
-  seedOnEmpty: process.env.SEED_ON_EMPTY !== 'false',
+  mailFrom: read('MAIL_FROM') || 'QuickStay <no-reply@quickstay.app>',
+  // Seeds demo data only into a completely empty database, and never in
+  // production unless explicitly enabled with SEED_ON_EMPTY=true.
+  seedOnEmpty: read('SEED_ON_EMPTY') ? read('SEED_ON_EMPTY') === 'true' : !isProd,
 };
-
-if (!env.jwtSecret) {
-  throw new Error('JWT_SECRET must be set in production');
-}
 
 module.exports = env;
