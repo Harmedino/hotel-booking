@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { Moon, Sun, CalendarCheck, Heart, UserRound, LayoutDashboard, LogOut, Building2, ChevronDown } from 'lucide-react';
 import { assets } from '../../assets/assets';
 import { useAuth } from '../../hooks/useAuth';
-import { logout } from '../../store/authSlice';
+import { useSignOut } from '../../hooks/useSignOut';
 import { Avatar } from '../ui/misc';
 import Button from '../ui/Button';
 import { cn } from '../../lib/cn';
@@ -42,8 +41,7 @@ export function ThemeToggle({ theme, toggle, className }) {
 function UserMenu({ user }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const signOut = useSignOut();
   useEffect(() => {
     const close = (e) => ref.current && !ref.current.contains(e.target) && setOpen(false);
     document.addEventListener('mousedown', close);
@@ -91,7 +89,7 @@ function UserMenu({ user }) {
             ))}
             <div className="my-1 h-px bg-line" />
             <button
-              onClick={() => { dispatch(logout()); navigate('/'); }}
+              onClick={signOut}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-rose-500 transition hover:bg-rose-500/10"
             >
               <LogOut className="h-4 w-4" /> Sign out

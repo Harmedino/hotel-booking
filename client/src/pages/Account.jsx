@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Camera, LogOut, Moon, Sun, CalendarCheck, Heart, LayoutDashboard, Building2, ChevronRight } from 'lucide-react';
 import PageShell from '../components/layout/PageShell';
@@ -9,7 +8,7 @@ import { Avatar, Switch } from '../components/ui/misc';
 import { useToast } from '../components/ui/Toast';
 import { useAuth } from '../hooks/useAuth';
 import { useChangePasswordMutation, useUpdateMeMutation, useUploadImagesMutation, errorMessage } from '../store/api';
-import { logout } from '../store/authSlice';
+import { useSignOut } from '../hooks/useSignOut';
 import { compressImage } from '../lib/images';
 
 const card = 'rounded-[28px] border border-line bg-surface p-6';
@@ -22,9 +21,9 @@ export default function Account({ theme, toggleTheme }) {
   const [changePassword, { isLoading: changing }] = useChangePasswordMutation();
   const [upload, { isLoading: uploading }] = useUploadImagesMutation();
   const fileRef = useRef(null);
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const toast = useToast();
+  const signOut = useSignOut();
 
   const saveProfile = async (e) => {
     e.preventDefault();
@@ -93,7 +92,7 @@ export default function Account({ theme, toggleTheme }) {
               <span className="flex-1">Dark mode</span>
               <Switch checked={theme === 'dark'} onChange={toggleTheme} label="Dark mode" />
             </div>
-            <button onClick={() => { dispatch(logout()); navigate('/'); }} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-rose-500 hover:bg-rose-500/10">
+            <button onClick={signOut} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-rose-500 hover:bg-rose-500/10">
               <LogOut className="h-4 w-4" /> Sign out
             </button>
           </div>

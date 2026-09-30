@@ -1,10 +1,9 @@
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
 import { AnimatePresence, motion } from 'motion/react';
 import { LayoutDashboard, BedDouble, CalendarRange, Building2, ArrowLeft, LogOut, Plus } from 'lucide-react';
 import { assets } from '../../assets/assets';
 import { useAuth } from '../../hooks/useAuth';
-import { logout } from '../../store/authSlice';
+import { useSignOut } from '../../hooks/useSignOut';
 import { Avatar } from '../../components/ui/misc';
 import { ThemeToggle } from '../../components/layout/Navbar';
 import Button from '../../components/ui/Button';
@@ -19,7 +18,7 @@ const NAV = [
 
 export default function OwnerLayout({ theme, toggleTheme }) {
   const { user } = useAuth();
-  const dispatch = useDispatch();
+  const signOut = useSignOut();
   const { pathname } = useLocation();
 
   return (
@@ -51,7 +50,7 @@ export default function OwnerLayout({ theme, toggleTheme }) {
               <p className="truncate text-sm font-semibold text-ink">{user.name}</p>
               <p className="truncate text-xs text-muted">{user.email}</p>
             </div>
-            <button onClick={() => dispatch(logout())} className="text-muted hover:text-rose-500" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
+            <button onClick={signOut} className="text-muted hover:text-rose-500" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
           </div>
         </div>
       </aside>

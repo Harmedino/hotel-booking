@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import { useToast } from '../components/ui/Toast';
 import { useLoginMutation, errorMessage } from '../store/api';
 import { setCredentials } from '../store/authSlice';
+import { safeNext } from '../lib/safeNext';
 
 const DEMOS = [
   { label: 'Demo guest', email: 'guest@quickstay.app', icon: UserRound },
@@ -29,7 +30,7 @@ export default function Login() {
       const res = await login(creds).unwrap();
       dispatch(setCredentials(res));
       toast.success(`Welcome back, ${res.user.name.split(' ')[0]}!`);
-      navigate(params.get('next') || (res.user.role === 'owner' && creds.email.startsWith('owner@') ? '/owner' : '/'), { replace: true });
+      navigate(safeNext(params.get('next'), res.user.role === 'owner' ? '/owner' : '/'), { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     }
