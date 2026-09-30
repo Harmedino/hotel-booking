@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js --watch ./ --ignore test/",
+    "build": "echo \"No build step for the API\"",
     "start": "node index.js",
-    "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
     "test": "node --test --test-concurrency=1 test/*.test.js"
   },
@@ -22,9 +22,9 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.24.4",
     "multer": "^2.4.0",
     "nodemailer": "^10.0.13",
-    "pg": "^8.23.0",
     "stripe": "^22.6.2",
     "zod": "^3.25.76"
   },

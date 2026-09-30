@@ -24,6 +24,6 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a date (YYYY-MM-DD)')
   .refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), 'must be a valid date');
 
-const uuid = z.string().uuid('is not a valid id');
+const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'is not a valid id');
 
-module.exports = { validate, z, isoDate, uuid };
+module.exports = { validate, z, isoDate, objectId };

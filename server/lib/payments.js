@@ -7,18 +7,18 @@ const isEnabled = () => Boolean(stripe);
 async function createCheckoutSession({ booking, roomType, hotelName }) {
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
-    customer_email: booking.guest_email,
-    client_reference_id: booking.id,
-    metadata: { bookingId: booking.id, reference: booking.reference },
+    customer_email: booking.guestEmail,
+    client_reference_id: String(booking._id),
+    metadata: { bookingId: String(booking._id), reference: booking.reference },
     line_items: [
       {
         quantity: 1,
         price_data: {
           currency: env.currency,
-          unit_amount: Math.round(Number(booking.total_price) * 100),
+          unit_amount: Math.round(Number(booking.totalPrice) * 100),
           product_data: {
             name: `${roomType} · ${hotelName}`,
-            description: `${booking.check_in} → ${booking.check_out} · ${booking.nights} night(s)`,
+            description: `${booking.checkIn} → ${booking.checkOut} · ${booking.nights} night(s)`,
           },
         },
       },

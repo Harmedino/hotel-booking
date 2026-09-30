@@ -1,5 +1,5 @@
 services:
-  # Backend API (Express). Frontend is hosted on Vercel.
+  # Backend API (Express + MongoDB). Frontend is hosted on Vercel.
   - type: web
     name: hotel-booking-api
     runtime: node
@@ -10,6 +10,18 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
-        value: "20"
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false # MongoDB Atlas connection string (replica set, needed for transactions)
+      - key: JWT_SECRET
+        generateValue: true
       - key: CLIENT_URL
         sync: false # your Vercel URL, e.g. https://hotel-booking.vercel.app
+      - key: APP_URL
+        sync: false # same as CLIENT_URL; used in emails and Stripe redirects
+      - key: STRIPE_SECRET_KEY
+        sync: false # optional
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false # optional

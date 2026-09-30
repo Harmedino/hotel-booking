@@ -1,16 +1,31 @@
 const crypto = require('crypto');
-const db = require('../db');
+const mongoose = require('mongoose');
 const env = require('../config/env');
+const { Room, Booking, PromoCode } = require('../models');
 const payments = require('./payments');
 const mailer = require('./mailer');
 const { nightsBetween, todayIso, quote } = require('./pricing');
 const { badRequest, notFound, conflict } = require('./errors');
 
-// Bookings that occupy inventory. Unpaid online bookings only hold the room briefly.
-const ACTIVE_BOOKING = `(b.status IN ('confirmed', 'checked_in', 'completed')
-  OR (b.status = 'pending' AND b.created_at > now() - interval '${env.holdMinutes} minutes'))`;
-
 const MAX_NIGHTS = 30;
+
+// Bookings that occupy inventory. Unpaid online bookings only hold the room briefly.
+function activeFilter() {
+  return {
+    $or: [
+      { status: { $in: ['confirmed', 'checked_in', 'completed'] } },
+      { status: 'pending', createdAt: { $gt: new Date(Date.now() - env.holdMinutes * 60 * 1000) } },
+    ],
+  };
+}
+
+// Mongo filter for bookings of `roomFilter` overlapping [checkIn, checkOut).
+const overlapFilter = (roomFilter, checkIn, checkOut) => ({
+  ...roomFilter,
+  ...activeFilter(),
+  checkIn: { $lt: checkOut },
+  checkOut: { $gt: checkIn },
+});
 
 function validateDates(checkIn, checkOut) {
   if (checkIn < todayIso()) throw badRequest('Check-in date cannot be in the past');
@@ -20,40 +35,43 @@ function validateDates(checkIn, checkOut) {
   return nights;
 }
 
-async function getPromo(code, client = db) {
+async function getPromo(code, session) {
   if (!code) return null;
-  const { rows } = await client.query(
-    `SELECT * FROM promo_codes
-     WHERE upper(code) = upper($1) AND is_active AND (expires_at IS NULL OR expires_at >= CURRENT_DATE)`,
-    [code.trim()]
-  );
-  if (!rows[0]) throw badRequest('That promo code is invalid or has expired');
-  return rows[0];
+  const promo = await PromoCode.findOne({
+    code: code.trim().toUpperCase(),
+    isActive: true,
+    $or: [{ expiresAt: null }, { expiresAt: { $exists: false } }, { expiresAt: { $gte: todayIso() } }],
+  }).session(session || null);
+  if (!promo) throw badRequest('That promo code is invalid or has expired');
+  return promo;
 }
 
-async function unitsBooked(client, roomId, checkIn, checkOut) {
-  const { rows } = await client.query(
-    `SELECT COUNT(*)::int AS n FROM bookings b
-     WHERE b.room_id = $1 AND ${ACTIVE_BOOKING} AND b.check_in < $3 AND b.check_out > $2`,
-    [roomId, checkIn, checkOut]
-  );
-  return rows[0].n;
+// Room ids that have no free units for the given dates.
+async function fullyBookedRoomIds(checkIn, checkOut) {
+  const counts = await Booking.aggregate([
+    { $match: overlapFilter({}, checkIn, checkOut) },
+    { $group: { _id: '$room', n: { $sum: 1 } } },
+  ]);
+  if (!counts.length) return [];
+  const rooms = await Room.find({ _id: { $in: counts.map((c) => c._id) } }).select('totalUnits');
+  const units = new Map(rooms.map((r) => [String(r._id), r.totalUnits]));
+  return counts.filter((c) => c.n >= (units.get(String(c._id)) || 1)).map((c) => c._id);
 }
 
 // Price + availability for a prospective stay. Does not reserve anything.
 async function getQuote({ roomId, checkIn, checkOut, guests, promoCode }) {
-  const room = await db.one('SELECT * FROM rooms WHERE id = $1', [roomId]);
+  const room = await Room.findById(roomId);
   if (!room) throw notFound('Room not found');
   const nights = validateDates(checkIn, checkOut);
-  if (guests > room.max_guests) throw badRequest(`This room fits up to ${room.max_guests} guests`);
+  if (guests > room.maxGuests) throw badRequest(`This room fits up to ${room.maxGuests} guests`);
   const promo = await getPromo(promoCode);
-  const booked = await unitsBooked(db.pool, roomId, checkIn, checkOut);
-  const unitsLeft = Math.max(room.total_units - booked, 0);
+  const booked = await Booking.countDocuments(overlapFilter({ room: room._id }, checkIn, checkOut));
+  const unitsLeft = Math.max(room.totalUnits - booked, 0);
   return {
-    available: room.is_available && unitsLeft > 0,
+    available: room.isAvailable && unitsLeft > 0,
     unitsLeft,
-    promo: promo ? { code: promo.code, title: promo.title, percentOff: promo.percent_off } : null,
-    ...quote({ pricePerNight: room.price_per_night, nights, percentOff: promo?.percent_off || 0 }),
+    promo: promo ? { code: promo.code, title: promo.title, percentOff: promo.percentOff } : null,
+    ...quote({ pricePerNight: room.pricePerNight, nights, percentOff: promo?.percentOff || 0 }),
   };
 }
 
@@ -66,78 +84,90 @@ async function createBooking(user, input) {
     throw badRequest('Online payment is not available right now. Choose pay at hotel.');
   }
 
-  const { booking, room } = await db.tx(async (client) => {
-    // Lock the room row so concurrent bookings for it are serialised.
-    const { rows } = await client.query(
-      `SELECT r.*, h.name AS hotel_name, h.is_active AS hotel_active
-       FROM rooms r JOIN hotels h ON h.id = r.hotel_id
-       WHERE r.id = $1 FOR UPDATE OF r`,
-      [roomId]
-    );
-    const room = rows[0];
-    if (!room || !room.hotel_active) throw notFound('Room not found');
-    if (!room.is_available) throw conflict('This room is not accepting bookings right now');
+  let booking;
+  let room;
+  // Retried automatically by the driver on transient write conflicts.
+  await mongoose.connection.transaction(async (session) => {
+    // Writing to the room first makes concurrent bookings of it conflict,
+    // so only one of them can pass the availability check below.
+    room = await Room.findOneAndUpdate({ _id: roomId }, { $inc: { bookingLock: 1 } }, { new: true, session }).populate({
+      path: 'hotel',
+      select: 'name isActive',
+      options: { session },
+    });
+    if (!room || !room.hotel?.isActive) throw notFound('Room not found');
+    if (!room.isAvailable) throw conflict('This room is not accepting bookings right now');
     const nights = validateDates(checkIn, checkOut);
-    if (guests > room.max_guests) throw badRequest(`This room fits up to ${room.max_guests} guests`);
+    if (guests > room.maxGuests) throw badRequest(`This room fits up to ${room.maxGuests} guests`);
 
-    const booked = await unitsBooked(client, roomId, checkIn, checkOut);
-    if (booked >= room.total_units) throw conflict('Sorry, this room was just booked for those dates. Try other dates.');
+    const booked = await Booking.countDocuments(overlapFilter({ room: room._id }, checkIn, checkOut)).session(session);
+    if (booked >= room.totalUnits) throw conflict('Sorry, this room was just booked for those dates. Try other dates.');
 
-    const promo = await getPromo(promoCode, client);
-    const price = quote({ pricePerNight: room.price_per_night, nights, percentOff: promo?.percent_off || 0 });
+    const promo = await getPromo(promoCode, session);
+    const price = quote({ pricePerNight: room.pricePerNight, nights, percentOff: promo?.percentOff || 0 });
 
-    const insert = await client.query(
-      `INSERT INTO bookings (reference, user_id, room_id, hotel_id, check_in, check_out, guests, nights,
-         price_per_night, subtotal, discount, taxes, total_price, promo_code, status, payment_method,
-         guest_name, guest_email, guest_phone, special_requests)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
-       RETURNING *`,
-      [
-        newReference(), user.id, roomId, room.hotel_id, checkIn, checkOut, guests, nights,
-        price.pricePerNight, price.subtotal, price.discount, price.taxes, price.total, promo?.code || null,
-        paymentMethod === 'stripe' ? 'pending' : 'confirmed', paymentMethod,
-        input.guestName || user.name, input.guestEmail || user.email, input.guestPhone || '', input.specialRequests || '',
-      ]
+    [booking] = await Booking.create(
+      [{
+        reference: newReference(),
+        user: user._id,
+        room: room._id,
+        hotel: room.hotel._id,
+        checkIn,
+        checkOut,
+        guests,
+        nights,
+        pricePerNight: price.pricePerNight,
+        subtotal: price.subtotal,
+        discount: price.discount,
+        taxes: price.taxes,
+        totalPrice: price.total,
+        promoCode: promo?.code,
+        status: paymentMethod === 'stripe' ? 'pending' : 'confirmed',
+        paymentMethod,
+        guestName: input.guestName || user.name,
+        guestEmail: input.guestEmail || user.email,
+        guestPhone: input.guestPhone || '',
+        specialRequests: input.specialRequests || '',
+      }],
+      { session }
     );
-    return { booking: insert.rows[0], room };
   });
 
   if (paymentMethod === 'stripe') {
     try {
-      const checkoutUrl = await startCheckout(booking, room.room_type, room.hotel_name);
+      const checkoutUrl = await startCheckout(booking, room.roomType, room.hotel.name);
       return { booking, checkoutUrl };
     } catch (err) {
-      await db.query('DELETE FROM bookings WHERE id = $1', [booking.id]);
+      await Booking.deleteOne({ _id: booking._id });
       throw err;
     }
   }
 
-  mailer.bookingConfirmed(booking, room.room_type, room.hotel_name);
+  mailer.bookingConfirmed(booking, room.roomType, room.hotel.name);
   return { booking, checkoutUrl: null };
 }
 
 async function startCheckout(booking, roomType, hotelName) {
   const session = await payments.createCheckoutSession({ booking, roomType, hotelName });
-  await db.query('UPDATE bookings SET stripe_session_id = $2, updated_at = now() WHERE id = $1', [booking.id, session.id]);
+  await Booking.updateOne({ _id: booking._id }, { stripeSessionId: session.id });
   return session.url;
 }
 
 // Idempotent: safe to call from both the webhook and the success-page verify.
 async function markSessionPaid(session) {
   if (session.payment_status !== 'paid') return null;
-  const b = await db.one(
-    `UPDATE bookings SET is_paid = true, stripe_payment_intent = $2,
-       status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END, updated_at = now()
-     WHERE stripe_session_id = $1 AND NOT is_paid RETURNING *`,
-    [session.id, typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id]
-  );
-  if (b) {
-    const info = await db.one(
-      'SELECT r.room_type, h.name AS hotel_name FROM rooms r JOIN hotels h ON h.id = r.hotel_id WHERE r.id = $1',
-      [b.room_id]
-    );
-    mailer.bookingConfirmed(b, info.room_type, info.hotel_name);
-  }
+  const pending = await Booking.findOne({ stripeSessionId: session.id, isPaid: false });
+  if (!pending) return null;
+  const b = await Booking.findOneAndUpdate(
+    { _id: pending._id, isPaid: false },
+    {
+      isPaid: true,
+      stripePaymentIntent: typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id,
+      status: pending.status === 'pending' ? 'confirmed' : pending.status,
+    },
+    { new: true }
+  ).populate('room', 'roomType').populate('hotel', 'name');
+  if (b) mailer.bookingConfirmed(b, b.room.roomType, b.hotel.name);
   return b;
 }
 
@@ -146,21 +176,22 @@ async function cancelBooking(booking) {
     throw badRequest(`A ${booking.status.replace('_', ' ')} booking cannot be cancelled`);
   }
   let refunded = false;
-  if (booking.is_paid && booking.payment_method === 'stripe' && booking.stripe_payment_intent && payments.isEnabled()) {
-    await payments.refund(booking.stripe_payment_intent);
+  if (booking.isPaid && booking.paymentMethod === 'stripe' && booking.stripePaymentIntent && payments.isEnabled()) {
+    await payments.refund(booking.stripePaymentIntent);
     refunded = true;
   }
-  const updated = await db.one(
-    `UPDATE bookings SET status = 'cancelled', cancelled_at = now(), is_refunded = $2, updated_at = now()
-     WHERE id = $1 RETURNING *`,
-    [booking.id, refunded]
-  );
-  mailer.bookingCancelled(updated);
-  return updated;
+  booking.status = 'cancelled';
+  booking.cancelledAt = new Date();
+  booking.isRefunded = refunded;
+  await booking.save();
+  mailer.bookingCancelled(booking);
+  return booking;
 }
 
 module.exports = {
-  ACTIVE_BOOKING,
+  activeFilter,
+  overlapFilter,
+  fullyBookedRoomIds,
   getQuote,
   createBooking,
   startCheckout,

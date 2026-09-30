@@ -36,14 +36,14 @@ const money = (n) => `$${Number(n).toFixed(2)}`;
 
 function bookingConfirmed(b, roomName, hotelName) {
   return send({
-    to: b.guest_email,
+    to: b.guestEmail,
     subject: `Booking confirmed · ${b.reference}`,
     html: layout(
       'Your stay is booked 🎉',
-      `<p>Hi ${b.guest_name},</p>
+      `<p>Hi ${b.guestName},</p>
        <p><b>${roomName}</b> at <b>${hotelName}</b></p>
-       <p>${b.check_in} → ${b.check_out} · ${b.nights} night(s) · ${b.guests} guest(s)</p>
-       <p>Total: <b>${money(b.total_price)}</b> (${b.is_paid ? 'paid' : 'pay at hotel'})</p>
+       <p>${b.checkIn} → ${b.checkOut} · ${b.nights} night(s) · ${b.guests} guest(s)</p>
+       <p>Total: <b>${money(b.totalPrice)}</b> (${b.isPaid ? 'paid' : 'pay at hotel'})</p>
        <p><a href="${env.appUrl}/my-bookings">View your booking</a></p>`
     ),
   });
@@ -51,12 +51,12 @@ function bookingConfirmed(b, roomName, hotelName) {
 
 function bookingCancelled(b) {
   return send({
-    to: b.guest_email,
+    to: b.guestEmail,
     subject: `Booking cancelled · ${b.reference}`,
     html: layout(
       'Your booking was cancelled',
-      `<p>Booking <b>${b.reference}</b> (${b.check_in} → ${b.check_out}) has been cancelled.</p>
-       ${b.is_refunded ? `<p>A refund of ${money(b.total_price)} is on its way to your card.</p>` : ''}`
+      `<p>Booking <b>${b.reference}</b> (${b.checkIn} → ${b.checkOut}) has been cancelled.</p>
+       ${b.isRefunded ? `<p>A refund of ${money(b.totalPrice)} is on its way to your card.</p>` : ''}`
     ),
   });
 }

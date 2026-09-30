@@ -3,8 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hotel Booking</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Book hand-picked hotels with live availability, clear prices and instant confirmation." />
+    <meta name="theme-color" content="#2563eb" />
+    <meta property="og:title" content="QuickStay · Book stays you will love" />
+    <meta property="og:description" content="Hand-picked hotels, live availability, instant confirmation." />
+    <title>QuickStay · Book stays you will love</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a light flash in dark mode.
+      try {
+        var t = localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        if (t === 'dark') document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

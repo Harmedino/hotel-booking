@@ -13,19 +13,18 @@ const env = {
   isProd,
   isTest,
   port: Number(process.env.PORT) || 4000,
-  databaseUrl:
-    process.env.DATABASE_URL ||
+  // Must be a replica set (e.g. MongoDB Atlas): bookings use transactions.
+  mongoUri:
+    (isTest && process.env.MONGODB_URI_TEST) ||
+    process.env.MONGODB_URI ||
     (isTest
-      ? 'postgres://quickstay:quickstay@localhost:5432/quickstay_test'
-      : 'postgres://quickstay:quickstay@localhost:5432/quickstay'),
-  databaseSsl: process.env.DATABASE_SSL === 'true',
+      ? 'mongodb://127.0.0.1:27017/quickstay_test?replicaSet=rs0'
+      : 'mongodb://127.0.0.1:27017/quickstay?replicaSet=rs0'),
   jwtSecret: process.env.JWT_SECRET || (isProd ? null : 'dev-only-insecure-secret'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientOrigins,
   // Public URL of the frontend, used in emails and Stripe redirects.
   appUrl: (process.env.APP_URL || clientOrigins[0] || 'http://localhost:5173').replace(/\/$/, ''),
-  // Public URL of this API, used to build absolute links in emails.
-  apiUrl: (process.env.API_URL || `http://localhost:${Number(process.env.PORT) || 4000}`).replace(/\/$/, ''),
   currency: (process.env.CURRENCY || 'usd').toLowerCase(),
   taxRate: process.env.TAX_RATE !== undefined ? Number(process.env.TAX_RATE) : 0.1,
   // Minutes an unpaid online-payment booking holds inventory.
