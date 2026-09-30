@@ -11,7 +11,7 @@
     "start": "node index.js",
     "migrate": "node db/migrate.js",
     "seed": "node db/seed.js",
-    "test": "node --test --test-concurrency=1 test/"
+    "test": "node --test --test-concurrency=1 test/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
