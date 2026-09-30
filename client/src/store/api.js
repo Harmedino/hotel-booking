@@ -22,8 +22,12 @@ const baseQuery = async (args, api, extra) => {
 // Pulls a readable message out of an RTK Query error.
 export const errorMessage = (err, fallback = 'Something went wrong. Please try again.') => {
   if (!err) return fallback;
-  if (err.status === 'FETCH_ERROR') return 'Cannot reach the server. Check your connection and try again.';
-  return err.data?.error || err.error || fallback;
+  if (err.status === 'FETCH_ERROR') return 'Cannot reach the server. It may be waking up; try again in a minute.';
+  // Hosts return an HTML error page (502/503) while the API is down or restarting.
+  if (err.status === 'PARSING_ERROR' || (typeof err.status === 'number' && err.status >= 502)) {
+    return 'The server is starting up or unavailable. Please try again in a minute.';
+  }
+  return err.data?.error || fallback;
 };
 
 const clean = (params) =>
