@@ -48,6 +48,8 @@ if (badOrigins.length) {
 }
 if (isProd && !clientOrigins.length) {
   problems.push('CLIENT_URL is required: your Vercel URL, e.g. https://hotel-booking-eosin-nu.vercel.app');
+} else if (isProd && clientOrigins.every(isLocal)) {
+  problems.push(`CLIENT_URL only allows ${clientOrigins.join(', ')}; set it to your Vercel URL so the deployed site can call the API`);
 }
 if (!isProd) clientOrigins.push('http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:4173');
 
@@ -73,6 +75,10 @@ if (stripeSecretKey && !stripeWebhookSecret) {
 }
 
 const smtpHost = read('SMTP_HOST') || '';
+const mailFrom = read('MAIL_FROM') || 'QuickStay <no-reply@quickstay.app>';
+if (smtpHost && /\]\(mailto:|^[^<]*\[/.test(mailFrom)) {
+  warnings.push('MAIL_FROM looks like pasted Markdown; use the form: QuickStay <no-reply@yourdomain.com>');
+}
 if (smtpHost && (!read('SMTP_USER') || !read('SMTP_PASS'))) {
   warnings.push('SMTP_HOST is set without SMTP_USER/SMTP_PASS: most providers will reject unauthenticated mail.');
 }
@@ -107,7 +113,7 @@ const env = {
     user: read('SMTP_USER') || '',
     pass: read('SMTP_PASS') || '',
   },
-  mailFrom: read('MAIL_FROM') || 'QuickStay <no-reply@quickstay.app>',
+  mailFrom,
   // Seeds demo data only into a completely empty database, and never in
   // production unless explicitly enabled with SEED_ON_EMPTY=true.
   seedOnEmpty: read('SEED_ON_EMPTY') ? read('SEED_ON_EMPTY') === 'true' : !isProd,

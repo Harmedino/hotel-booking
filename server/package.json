@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js --watch ./ --ignore test/",
-    "build": "echo \"No build step for the API\"",
+    "build": "node scripts/build.js",
     "start": "node index.js",
     "seed": "node db/seed.js",
     "test": "node --test --test-concurrency=1 test/*.test.js"
