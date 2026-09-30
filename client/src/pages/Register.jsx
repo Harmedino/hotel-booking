@@ -9,6 +9,7 @@ import { useToast } from '../components/ui/Toast';
 import { useRegisterMutation, errorMessage } from '../store/api';
 import { setCredentials } from '../store/authSlice';
 import { cn } from '../lib/cn';
+import { safeNext } from '../lib/safeNext';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
@@ -32,7 +33,7 @@ export default function Register() {
       const res = await register({ name: form.name, email: form.email, password: form.password }).unwrap();
       dispatch(setCredentials(res));
       toast.success('Account created. Welcome to QuickStay!');
-      navigate(params.get('next') || '/', { replace: true });
+      navigate(safeNext(params.get('next')), { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     }
