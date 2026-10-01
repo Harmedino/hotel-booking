@@ -184,3 +184,79 @@ test('race: five simultaneous bookings for the last unit, exactly one wins', asy
   const statuses = results.map((r) => r.status).sort();
   assert.deepEqual(statuses, [201, 409, 409, 409, 409]);
 });
+
+test('smart pricing: weekend and seasonal rates, night by night', async () => {
+  const hotels = await api.get('/api/owner/hotels').set(auth(ownerToken));
+  // The first Thursday at least 30 days out: Thu night standard, Fri and Sat weekend.
+  let thu = 30;
+  while (new Date(`${day(thu)}T00:00:00Z`).getUTCDay() !== 4) thu += 1;
+  const room = await api.post('/api/owner/rooms').set(auth(ownerToken)).send({
+    hotelId: hotels.body[0].id, roomType: 'Priced Room', pricePerNight: 100, weekendPrice: 150, totalUnits: 2,
+    seasonalRates: [{ name: 'Carnival', start: day(thu + 7), end: day(thu + 7), price: 300 }],
+    images: ['/static/seed/roomImg1.png'],
+  });
+  assert.equal(room.status, 201);
+  assert.equal(room.body.weekendPrice, 150);
+
+  const weekend = await api.get(`/api/rooms/${room.body.id}/quote?checkIn=${day(thu)}&checkOut=${day(thu + 3)}`);
+  assert.equal(weekend.body.subtotal, 400);
+  assert.deepEqual(weekend.body.lines, [{ label: 'Standard', price: 100, nights: 1 }, { label: 'Weekend', price: 150, nights: 2 }]);
+
+  // The season beats the weekend price.
+  const season = await api.get(`/api/rooms/${room.body.id}/quote?checkIn=${day(thu + 7)}&checkOut=${day(thu + 8)}`);
+  assert.equal(season.body.subtotal, 300);
+  assert.equal(season.body.lines[0].label, 'Carnival');
+
+  const booked = await api.post('/api/bookings').set(auth(guestToken)).send({
+    roomId: room.body.id, checkIn: day(thu), checkOut: day(thu + 3), guests: 1, paymentMethod: 'pay_at_hotel',
+    guestName: 'Weekend Guest', guestEmail: 'wk@example.com',
+  });
+  assert.equal(booked.body.booking.subtotal, 400);
+  assert.equal(booked.body.booking.priceLines.length, 2);
+
+  const badSeason = await api.patch(`/api/owner/rooms/${room.body.id}`).set(auth(ownerToken)).send({
+    seasonalRates: [{ name: 'Backwards', start: day(50), end: day(40), price: 10 }],
+  });
+  assert.equal(badSeason.status, 400);
+  const cleared = await api.patch(`/api/owner/rooms/${room.body.id}`).set(auth(ownerToken)).send({ weekendPrice: null });
+  assert.equal(cleared.body.weekendPrice, null);
+});
+
+test('blocked dates take units out of sale; calendars show it', async () => {
+  const hotels = await api.get('/api/owner/hotels').set(auth(ownerToken));
+  const room = (await api.post('/api/owner/rooms').set(auth(ownerToken)).send({
+    hotelId: hotels.body[0].id, roomType: 'Blockable Room', pricePerNight: 80, totalUnits: 2, images: ['/static/seed/roomImg1.png'],
+  })).body;
+  const stay = {
+    roomId: room.id, checkIn: day(70), checkOut: day(71), guests: 1, paymentMethod: 'pay_at_hotel',
+    guestName: 'Blocker', guestEmail: 'block@example.com',
+  };
+
+  const block = await api.post('/api/owner/blocks').set(auth(ownerToken)).send({ roomId: room.id, start: day(70), end: day(72), units: 1, note: 'Repairs' });
+  assert.equal(block.status, 201);
+
+  const cal = await api.get(`/api/rooms/${room.id}/calendar?from=${day(69)}&days=4`);
+  assert.deepEqual(cal.body.days.map((d) => d.unitsLeft), [2, 1, 1, 2]);
+
+  assert.equal((await api.post('/api/bookings').set(auth(guestToken)).send(stay)).status, 201);
+  assert.equal((await api.post('/api/bookings').set(auth(guestToken)).send(stay)).status, 409, 'one booked + one blocked = full');
+
+  // Full rooms drop out of search for those dates.
+  const search = await api.get(`/api/rooms?destination=Blockable&checkIn=${day(70)}&checkOut=${day(71)}`);
+  assert.equal(search.body.items.length, 0);
+
+  // Can't block a unit a guest already has.
+  const tooMuch = await api.post('/api/owner/blocks').set(auth(ownerToken)).send({ roomId: room.id, start: day(70), end: day(71), units: 1 });
+  assert.equal(tooMuch.status, 409);
+
+  const grid = await api.get(`/api/owner/calendar?from=${day(69)}&days=4`).set(auth(ownerToken));
+  const row = grid.body.rooms.find((r) => r.id === room.id);
+  assert.deepEqual(row.nights.map((n) => n.used), [0, 2, 1, 0]);
+  assert.equal(row.bookings.length, 1);
+  assert.equal(row.blocks[0].note, 'Repairs');
+
+  // Only the owner can lift it; then the room is bookable again.
+  assert.equal((await api.delete(`/api/owner/blocks/${block.body.id}`).set(auth(guestToken))).status, 404);
+  assert.equal((await api.delete(`/api/owner/blocks/${block.body.id}`).set(auth(ownerToken))).status, 200);
+  assert.equal((await api.post('/api/bookings').set(auth(guestToken)).send(stay)).status, 201);
+});

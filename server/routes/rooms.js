@@ -3,8 +3,8 @@ const { Room, Hotel, Booking, Review } = require('../models');
 const { validate, z, isoDate, objectId } = require('../lib/validate');
 const { ah, notFound, forbidden, conflict } = require('../lib/errors');
 const { optionalAuth, requireAuth } = require('../lib/auth');
-const { getQuote, validateDates, fullyBookedRoomIds } = require('../lib/bookings');
-const { todayIso } = require('../lib/pricing');
+const { getQuote, validateDates, fullyBookedRoomIds, usedByNight } = require('../lib/bookings');
+const { todayIso, addDays, rateFor } = require('../lib/pricing');
 const serialize = require('../lib/serializers');
 
 const router = express.Router();
@@ -146,6 +146,26 @@ const quoteSchema = z.object({
 
 router.get('/:id/quote', validate(quoteSchema, 'query'), ah(async (req, res) => {
   res.json(await getQuote({ roomId: req.params.id, ...req.validQuery }));
+}));
+
+// Night-by-night price and free units, for the date picker.
+const calendarSchema = z.object({ from: isoDate.optional(), days: z.coerce.number().int().min(1).max(180).default(90) });
+
+router.get('/:id/calendar', validate(calendarSchema, 'query'), ah(async (req, res) => {
+  if (!/^[a-f\d]{24}$/i.test(req.params.id)) throw notFound('Room not found');
+  const room = await Room.findById(req.params.id).populate('hotel', 'isActive');
+  if (!room) throw notFound('Room not found');
+  const today = todayIso();
+  const from = req.validQuery.from && req.validQuery.from > today ? req.validQuery.from : today;
+  const to = addDays(from, req.validQuery.days);
+  const open = room.isAvailable && room.hotel?.isActive;
+  const used = (await usedByNight([room._id], from, to)).get(String(room._id));
+  const days = [];
+  for (let d = from; d < to; d = addDays(d, 1)) {
+    const { price, label } = rateFor(room, d);
+    days.push({ date: d, price, label, unitsLeft: open ? Math.max(room.totalUnits - (used?.get(d) || 0), 0) : 0 });
+  }
+  res.json({ from, to, basePrice: room.pricePerNight, days });
 }));
 
 router.get('/:id/reviews', ah(async (req, res) => {

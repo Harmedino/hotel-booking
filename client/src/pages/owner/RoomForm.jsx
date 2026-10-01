@@ -15,7 +15,8 @@ import { imageUrl } from '../../lib/config';
 import { cn } from '../../lib/cn';
 
 const TYPES = ['Single Bed', 'Double Bed', 'Family Suite', 'Luxury Room', 'Studio', 'Penthouse'];
-const EMPTY = { hotelId: '', roomType: 'Double Bed', description: '', pricePerNight: '', maxGuests: 2, totalUnits: 1, amenities: ['Free WiFi'], images: [], isAvailable: true };
+const EMPTY = { hotelId: '', roomType: 'Double Bed', description: '', pricePerNight: '', maxGuests: 2, totalUnits: 1, amenities: ['Free WiFi'], images: [], isAvailable: true, weekendPrice: '', seasonalRates: [] };
+const NEW_SEASON = { name: '', start: '', end: '', price: '' };
 
 export default function RoomForm() {
   const { id } = useParams();
@@ -36,7 +37,7 @@ export default function RoomForm() {
   useEffect(() => {
     if (editing && rooms) {
       const r = rooms.find((x) => x.id === id);
-      if (r) setForm({ hotelId: r.hotelId, roomType: r.roomType, description: r.description, pricePerNight: r.pricePerNight, maxGuests: r.maxGuests, totalUnits: r.totalUnits, amenities: r.amenities, images: r.images, isAvailable: r.isAvailable });
+      if (r) setForm({ hotelId: r.hotelId, roomType: r.roomType, description: r.description, pricePerNight: r.pricePerNight, maxGuests: r.maxGuests, totalUnits: r.totalUnits, amenities: r.amenities, images: r.images, isAvailable: r.isAvailable, weekendPrice: r.weekendPrice ?? '', seasonalRates: r.seasonalRates || [] });
     }
   }, [editing, rooms, id]);
 
@@ -66,7 +67,17 @@ export default function RoomForm() {
   const submit = async (e) => {
     e.preventDefault();
     if (!form.images.length) return toast.error('Add at least one photo');
-    const body = { ...form, pricePerNight: Number(form.pricePerNight), maxGuests: Number(form.maxGuests), totalUnits: Number(form.totalUnits) };
+    const seasons = form.seasonalRates.filter((r) => r.name || r.start || r.end || r.price);
+    if (seasons.some((r) => !r.name.trim() || !r.start || !r.end || !Number(r.price))) return toast.error('Give every seasonal rate a name, dates and a price');
+    if (seasons.some((r) => r.end < r.start)) return toast.error('A seasonal rate ends before it starts');
+    const body = {
+      ...form,
+      pricePerNight: Number(form.pricePerNight),
+      maxGuests: Number(form.maxGuests),
+      totalUnits: Number(form.totalUnits),
+      weekendPrice: form.weekendPrice === '' ? null : Number(form.weekendPrice),
+      seasonalRates: seasons.map((r) => ({ name: r.name.trim(), start: r.start, end: r.end, price: Number(r.price) })),
+    };
     try {
       if (editing) await updateRoom({ id, ...body }).unwrap();
       else await createRoom(body).unwrap();
@@ -175,10 +186,53 @@ export default function RoomForm() {
               <Input label="Max guests" type="number" min={1} max={20} required value={form.maxGuests} onChange={(e) => set('maxGuests', e.target.value)} />
               <Input label="Units" type="number" min={1} max={500} required value={form.totalUnits} onChange={(e) => set('totalUnits', e.target.value)} hint="Identical rooms" />
             </div>
+            <Input
+              label="Weekend price (optional)"
+              type="number"
+              min={1}
+              step="0.01"
+              value={form.weekendPrice}
+              onChange={(e) => set('weekendPrice', e.target.value)}
+              placeholder={form.pricePerNight ? String(Math.round(form.pricePerNight * 1.2)) : '239'}
+              hint="Friday and Saturday nights. Leave empty to charge the normal price."
+            />
             <label className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3 text-sm text-ink">
               Accepting bookings
               <Switch checked={form.isAvailable} onChange={(v) => set('isAvailable', v)} label="Accepting bookings" />
             </label>
+          </section>
+          <section className="space-y-3 rounded-[24px] border border-line bg-surface p-5">
+            <div>
+              <h2 className="font-semibold text-ink">Seasonal rates</h2>
+              <p className="mt-0.5 text-xs text-muted">A different price for busy dates, like holidays or festivals. Beats the weekend price.</p>
+            </div>
+            <AnimatePresence initial={false}>
+              {form.seasonalRates.map((season, i) => {
+                const update = (k, v) => set('seasonalRates', form.seasonalRates.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+                return (
+                  <motion.div key={i} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                    <div className="space-y-2 rounded-2xl bg-surface-2 p-3">
+                      <div className="flex items-center gap-2">
+                        <input value={season.name} onChange={(e) => update('name', e.target.value)} placeholder="Name, e.g. Festive season" aria-label="Season name" className="min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand" />
+                        <button type="button" onClick={() => set('seasonalRates', form.seasonalRates.filter((_, j) => j !== i))} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-rose-500/10 hover:text-rose-500" aria-label="Remove seasonal rate">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-[11px] font-medium text-muted">From<input type="date" value={season.start} onChange={(e) => update('start', e.target.value)} className="mt-0.5 block w-full rounded-xl border border-line bg-surface px-2 py-2 text-sm text-ink outline-none focus:border-brand" /></label>
+                        <label className="text-[11px] font-medium text-muted">To (last night)<input type="date" min={season.start || undefined} value={season.end} onChange={(e) => update('end', e.target.value)} className="mt-0.5 block w-full rounded-xl border border-line bg-surface px-2 py-2 text-sm text-ink outline-none focus:border-brand" /></label>
+                      </div>
+                      <label className="block text-[11px] font-medium text-muted">Price per night<input type="number" min={1} step="0.01" value={season.price} onChange={(e) => update('price', e.target.value)} className="mt-0.5 block w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand" /></label>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+            {form.seasonalRates.length < 12 && (
+              <Button type="button" variant="secondary" size="sm" className="w-full" onClick={() => set('seasonalRates', [...form.seasonalRates, NEW_SEASON])}>
+                <Plus className="h-4 w-4" /> Add a seasonal rate
+              </Button>
+            )}
           </section>
           <Button size="lg" className="w-full" loading={creating || updating} disabled={uploading > 0}>
             {editing ? 'Save changes' : 'Publish room'}

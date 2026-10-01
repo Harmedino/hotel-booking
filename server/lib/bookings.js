@@ -1,10 +1,10 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const env = require('../config/env');
-const { Room, Booking, PromoCode } = require('../models');
+const { Room, RoomBlock, Booking, PromoCode } = require('../models');
 const payments = require('./payments');
 const mailer = require('./mailer');
-const { nightsBetween, todayIso, quote } = require('./pricing');
+const { nightsBetween, todayIso, addDays, nightlyRates, quote } = require('./pricing');
 const { badRequest, notFound, conflict } = require('./errors');
 
 const MAX_NIGHTS = 30;
@@ -46,32 +46,55 @@ async function getPromo(code, session) {
   return promo;
 }
 
+// Units in use per room per night in [from, to): active bookings plus blocked units.
+// Returns Map(roomId -> Map(date -> units)).
+async function usedByNight(roomIds, from, to, session) {
+  const roomFilter = roomIds ? { room: { $in: roomIds } } : {};
+  const [bookings, blocks] = await Promise.all([
+    Booking.find(overlapFilter(roomFilter, from, to)).select('room checkIn checkOut').session(session || null).lean(),
+    RoomBlock.find({ ...roomFilter, start: { $lt: to }, end: { $gt: from } }).select('room start end units').session(session || null).lean(),
+  ]);
+  const used = new Map();
+  const add = (room, start, end, units) => {
+    const key = String(room);
+    if (!used.has(key)) used.set(key, new Map());
+    const nights = used.get(key);
+    for (let d = start > from ? start : from; d < (end < to ? end : to); d = addDays(d, 1)) nights.set(d, (nights.get(d) || 0) + units);
+  };
+  bookings.forEach((b) => add(b.room, b.checkIn, b.checkOut, 1));
+  blocks.forEach((b) => add(b.room, b.start, b.end, b.units));
+  return used;
+}
+
+// The busiest night decides how many units are free for the whole stay.
+const peakUsed = (nights) => (nights ? Math.max(0, ...nights.values()) : 0);
+
+async function unitsLeftFor(room, checkIn, checkOut, session) {
+  const used = await usedByNight([room._id], checkIn, checkOut, session);
+  return Math.max(room.totalUnits - peakUsed(used.get(String(room._id))), 0);
+}
+
 // Room ids that have no free units for the given dates.
 async function fullyBookedRoomIds(checkIn, checkOut) {
-  const counts = await Booking.aggregate([
-    { $match: overlapFilter({}, checkIn, checkOut) },
-    { $group: { _id: '$room', n: { $sum: 1 } } },
-  ]);
-  if (!counts.length) return [];
-  const rooms = await Room.find({ _id: { $in: counts.map((c) => c._id) } }).select('totalUnits');
-  const units = new Map(rooms.map((r) => [String(r._id), r.totalUnits]));
-  return counts.filter((c) => c.n >= (units.get(String(c._id)) || 1)).map((c) => c._id);
+  const used = await usedByNight(null, checkIn, checkOut);
+  if (!used.size) return [];
+  const rooms = await Room.find({ _id: { $in: [...used.keys()] } }).select('totalUnits');
+  return rooms.filter((r) => peakUsed(used.get(String(r._id))) >= r.totalUnits).map((r) => r._id);
 }
 
 // Price + availability for a prospective stay. Does not reserve anything.
 async function getQuote({ roomId, checkIn, checkOut, guests, promoCode }) {
   const room = await Room.findById(roomId);
   if (!room) throw notFound('Room not found');
-  const nights = validateDates(checkIn, checkOut);
+  validateDates(checkIn, checkOut);
   if (guests > room.maxGuests) throw badRequest(`This room fits up to ${room.maxGuests} guests`);
   const promo = await getPromo(promoCode);
-  const booked = await Booking.countDocuments(overlapFilter({ room: room._id }, checkIn, checkOut));
-  const unitsLeft = Math.max(room.totalUnits - booked, 0);
+  const unitsLeft = await unitsLeftFor(room, checkIn, checkOut);
   return {
     available: room.isAvailable && unitsLeft > 0,
     unitsLeft,
     promo: promo ? { code: promo.code, title: promo.title, percentOff: promo.percentOff } : null,
-    ...quote({ pricePerNight: room.pricePerNight, nights, percentOff: promo?.percentOff || 0 }),
+    ...quote({ nightly: nightlyRates(room, checkIn, checkOut), percentOff: promo?.percentOff || 0 }),
   };
 }
 
@@ -97,14 +120,15 @@ async function createBooking(user, input) {
     });
     if (!room || !room.hotel?.isActive) throw notFound('Room not found');
     if (!room.isAvailable) throw conflict('This room is not accepting bookings right now');
-    const nights = validateDates(checkIn, checkOut);
+    validateDates(checkIn, checkOut);
     if (guests > room.maxGuests) throw badRequest(`This room fits up to ${room.maxGuests} guests`);
 
-    const booked = await Booking.countDocuments(overlapFilter({ room: room._id }, checkIn, checkOut)).session(session);
-    if (booked >= room.totalUnits) throw conflict('Sorry, this room was just booked for those dates. Try other dates.');
+    if ((await unitsLeftFor(room, checkIn, checkOut, session)) < 1) {
+      throw conflict('Sorry, this room was just booked for those dates. Try other dates.');
+    }
 
     const promo = await getPromo(promoCode, session);
-    const price = quote({ pricePerNight: room.pricePerNight, nights, percentOff: promo?.percentOff || 0 });
+    const price = quote({ nightly: nightlyRates(room, checkIn, checkOut), percentOff: promo?.percentOff || 0 });
 
     [booking] = await Booking.create(
       [{
@@ -115,8 +139,9 @@ async function createBooking(user, input) {
         checkIn,
         checkOut,
         guests,
-        nights,
+        nights: price.nights,
         pricePerNight: price.pricePerNight,
+        priceLines: price.lines.length > 1 || price.lines[0]?.label !== 'Standard' ? price.lines : undefined,
         subtotal: price.subtotal,
         discount: price.discount,
         taxes: price.taxes,
@@ -191,6 +216,8 @@ async function cancelBooking(booking) {
 module.exports = {
   activeFilter,
   overlapFilter,
+  usedByNight,
+  peakUsed,
   fullyBookedRoomIds,
   getQuote,
   createBooking,
