@@ -5,7 +5,8 @@ import { CalendarDays, CreditCard, Hotel, Minus, Plus, Tag, CheckCircle2, AlertC
 import { useAuth } from '../../hooks/useAuth';
 import { useDebounce } from '../../hooks/useDebounce';
 import { useCreateBookingMutation, useGetConfigQuery, useGetQuoteQuery, errorMessage } from '../../store/api';
-import { addDaysIso, dateRange, money, moneyRound, plural, todayIso } from '../../lib/format';
+import { dateRange, money, moneyRound, plural, shortDate, todayIso } from '../../lib/format';
+import StayCalendar from './StayCalendar';
 import { cn } from '../../lib/cn';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
@@ -15,10 +16,24 @@ import { useToast } from '../ui/Toast';
 function PriceLines({ quote }) {
   return (
     <div className="space-y-2 text-sm">
-      <div className="flex justify-between text-muted">
-        <span>{money(quote.pricePerNight)} × {plural(quote.nights, 'night')}</span>
-        <span className="text-ink">{money(quote.subtotal)}</span>
-      </div>
+      {quote.lines?.length > 1 || (quote.lines?.[0] && quote.lines[0].label !== 'Standard') ? (
+        quote.lines.map((line) => (
+          <div key={`${line.label}-${line.price}`} className="flex justify-between gap-3 text-muted">
+            <span>
+              {money(line.price)} × {plural(line.nights, 'night')}
+              {line.label !== 'Standard' && (
+                <span className="ml-1.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">{line.label}</span>
+              )}
+            </span>
+            <span className="shrink-0 text-ink">{money(line.price * line.nights)}</span>
+          </div>
+        ))
+      ) : (
+        <div className="flex justify-between text-muted">
+          <span>{money(quote.pricePerNight)} × {plural(quote.nights, 'night')}</span>
+          <span className="text-ink">{money(quote.subtotal)}</span>
+        </div>
+      )}
       {quote.discount > 0 && (
         <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
           <span>Promo {quote.promo?.code} (−{quote.percentOff}%)</span>
@@ -46,6 +61,8 @@ export default function BookingPanel({ room, mobileOpen, setMobileOpen }) {
   const [promoInput, setPromoInput] = useState('');
   const [promo, setPromo] = useState('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  // Open straight away when there are no dates yet: the prices and free nights are the point.
+  const [calendarOpen, setCalendarOpen] = useState(!initialIn);
 
   const { user, isAuthed } = useAuth();
   const navigate = useNavigate();
@@ -56,9 +73,11 @@ export default function BookingPanel({ room, mobileOpen, setMobileOpen }) {
   const q = useDebounce({ id: room.id, checkIn, checkOut, guests, promoCode: promo }, 250);
   const { data: quote, error: quoteError, isFetching } = useGetQuoteQuery(q, { skip: !(q.checkIn && q.checkOut && q.checkOut > q.checkIn) });
 
-  const onCheckIn = (v) => {
-    setCheckIn(v);
-    if (v && (!checkOut || checkOut <= v)) setCheckOut(addDaysIso(v, 1));
+  const onDates = ({ checkIn: nextIn, checkOut: nextOut }) => {
+    setCheckIn(nextIn);
+    setCheckOut(nextOut);
+    // Range complete: fold the calendar away so the price shows.
+    if (nextIn && nextOut) setTimeout(() => setCalendarOpen(false), 250);
   };
 
   const reserve = () => {
@@ -87,15 +106,31 @@ export default function BookingPanel({ room, mobileOpen, setMobileOpen }) {
 
       <div className="overflow-hidden rounded-2xl border border-line">
         <div className="grid grid-cols-2 divide-x divide-line">
-          <label className="block px-4 py-3 focus-within:bg-surface-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Check in</span>
-            <input type="date" min={todayIso()} value={checkIn} onChange={(e) => onCheckIn(e.target.value)} className="block w-full bg-transparent text-sm font-medium text-ink outline-none" />
-          </label>
-          <label className="block px-4 py-3 focus-within:bg-surface-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Check out</span>
-            <input type="date" min={checkIn ? addDaysIso(checkIn, 1) : todayIso()} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} className="block w-full bg-transparent text-sm font-medium text-ink outline-none" />
-          </label>
+          {[
+            ['Check in', checkIn],
+            ['Check out', checkOut],
+          ].map(([label, value]) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setCalendarOpen((open) => !open || !ready)}
+              aria-expanded={calendarOpen}
+              className={cn('block px-4 py-3 text-left transition-colors hover:bg-surface-2', calendarOpen && 'bg-surface-2')}
+            >
+              <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</span>
+              <span className={cn('block text-sm font-medium', value ? 'text-ink' : 'text-muted')}>{value ? shortDate(value) : 'Add date'}</span>
+            </button>
+          ))}
         </div>
+        <AnimatePresence initial={false}>
+          {calendarOpen && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22 }} className="overflow-hidden border-t border-line">
+              <div className="p-3 sm:p-4">
+                <StayCalendar roomId={room.id} checkIn={checkIn} checkOut={checkOut} onChange={onDates} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="flex items-center justify-between border-t border-line px-4 py-3">
           <div>
             <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted">Guests</span>

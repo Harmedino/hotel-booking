@@ -36,7 +36,7 @@ const clean = (params) =>
 export const api = createApi({
   reducerPath: 'api',
   baseQuery,
-  tagTypes: ['Me', 'Room', 'Rooms', 'Booking', 'Wishlist', 'Review', 'OwnerHotel', 'OwnerRoom', 'OwnerBooking', 'OwnerStats'],
+  tagTypes: ['Me', 'Room', 'Rooms', 'Booking', 'Wishlist', 'Review', 'OwnerHotel', 'OwnerRoom', 'OwnerBooking', 'OwnerStats', 'Calendar', 'OwnerCalendar'],
   endpoints: (b) => ({
     // Public
     getConfig: b.query({ query: () => '/config' }),
@@ -48,6 +48,11 @@ export const api = createApi({
     getFeatured: b.query({ query: () => '/rooms/featured', providesTags: ['Rooms'] }),
     getRoom: b.query({ query: (id) => `/rooms/${id}`, providesTags: (r, e, id) => [{ type: 'Room', id }] }),
     getSimilar: b.query({ query: (id) => `/rooms/${id}/similar` }),
+    getRoomCalendar: b.query({
+      query: (id) => ({ url: `/rooms/${id}/calendar`, params: { days: 180 } }),
+      providesTags: (r, e, id) => [{ type: 'Calendar', id }],
+      keepUnusedDataFor: 60,
+    }),
     getQuote: b.query({ query: ({ id, ...params }) => ({ url: `/rooms/${id}/quote`, params: clean(params) }), keepUnusedDataFor: 10 }),
     getReviews: b.query({ query: (id) => `/rooms/${id}/reviews`, providesTags: (r, e, id) => [{ type: 'Review', id }] }),
     addReview: b.mutation({
@@ -83,12 +88,13 @@ export const api = createApi({
     // Bookings
     createBooking: b.mutation({
       query: (body) => ({ url: '/bookings', method: 'POST', body }),
-      invalidatesTags: ['Booking', 'OwnerBooking', 'OwnerStats'],
+      invalidatesTags: ['Booking', 'OwnerBooking', 'OwnerStats', 'Calendar', 'OwnerCalendar'],
     }),
     myBookings: b.query({ query: () => '/bookings/mine', providesTags: ['Booking'] }),
+    getBooking: b.query({ query: (id) => `/bookings/${id}`, providesTags: ['Booking'] }),
     cancelBooking: b.mutation({
       query: (id) => ({ url: `/bookings/${id}/cancel`, method: 'POST' }),
-      invalidatesTags: ['Booking', 'OwnerBooking', 'OwnerStats'],
+      invalidatesTags: ['Booking', 'OwnerBooking', 'OwnerStats', 'Calendar', 'OwnerCalendar'],
     }),
     payBooking: b.mutation({ query: (id) => ({ url: `/bookings/${id}/pay`, method: 'POST' }) }),
     verifyPayment: b.query({ query: (sessionId) => ({ url: '/payments/verify', params: { session_id: sessionId } }) }),
@@ -144,7 +150,7 @@ export const api = createApi({
     }),
     updateRoom: b.mutation({
       query: ({ id, ...body }) => ({ url: `/owner/rooms/${id}`, method: 'PATCH', body }),
-      invalidatesTags: (r, e, { id }) => ['OwnerRoom', 'Rooms', { type: 'Room', id }],
+      invalidatesTags: (r, e, { id }) => ['OwnerRoom', 'Rooms', { type: 'Room', id }, { type: 'Calendar', id }, 'OwnerCalendar'],
     }),
     deleteRoom: b.mutation({
       query: (id) => ({ url: `/owner/rooms/${id}`, method: 'DELETE' }),
@@ -153,7 +159,19 @@ export const api = createApi({
     ownerBookings: b.query({ query: (params) => ({ url: '/owner/bookings', params: clean(params) }), providesTags: ['OwnerBooking'] }),
     updateOwnerBooking: b.mutation({
       query: ({ id, ...body }) => ({ url: `/owner/bookings/${id}`, method: 'PATCH', body }),
-      invalidatesTags: ['OwnerBooking', 'OwnerStats', 'Booking'],
+      invalidatesTags: ['OwnerBooking', 'OwnerStats', 'Booking', 'Calendar', 'OwnerCalendar'],
+    }),
+    ownerCalendar: b.query({
+      query: ({ from, days }) => ({ url: '/owner/calendar', params: clean({ from, days }) }),
+      providesTags: ['OwnerCalendar'],
+    }),
+    createBlock: b.mutation({
+      query: (body) => ({ url: '/owner/blocks', method: 'POST', body }),
+      invalidatesTags: ['OwnerCalendar', 'Calendar', 'Rooms'],
+    }),
+    deleteBlock: b.mutation({
+      query: (id) => ({ url: `/owner/blocks/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['OwnerCalendar', 'Calendar', 'Rooms'],
     }),
     ownerStats: b.query({ query: (days) => ({ url: '/owner/stats', params: { days } }), providesTags: ['OwnerStats'] }),
   }),
@@ -161,7 +179,8 @@ export const api = createApi({
 
 export const {
   useGetConfigQuery, useGetStatsQuery, useGetCitiesQuery, useGetOffersQuery, useGetFiltersQuery, useGetRoomsQuery,
-  useGetFeaturedQuery, useGetRoomQuery, useGetSimilarQuery, useGetQuoteQuery, useGetReviewsQuery, useAddReviewMutation,
+  useGetFeaturedQuery, useGetRoomQuery, useGetRoomCalendarQuery, useGetBookingQuery, useOwnerCalendarQuery,
+  useCreateBlockMutation, useDeleteBlockMutation, useGetSimilarQuery, useGetQuoteQuery, useGetReviewsQuery, useAddReviewMutation,
   useSubscribeMutation, useLoginMutation, useRegisterMutation, useForgotPasswordMutation, useResetPasswordMutation,
   useGetMeQuery, useUpdateMeMutation, useChangePasswordMutation, useCreateBookingMutation, useMyBookingsQuery,
   useCancelBookingMutation, usePayBookingMutation, useVerifyPaymentQuery, useWishlistQuery, useWishlistIdsQuery,
