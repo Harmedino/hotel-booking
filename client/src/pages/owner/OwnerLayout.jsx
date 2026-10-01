@@ -1,6 +1,6 @@
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
-import { LayoutDashboard, BedDouble, CalendarRange, Building2, ArrowLeft, LogOut, Plus } from 'lucide-react';
+import { LayoutDashboard, BedDouble, CalendarRange, CalendarDays, Building2, ArrowLeft, LogOut, Plus } from 'lucide-react';
 import { assets } from '../../assets/assets';
 import { useAuth } from '../../hooks/useAuth';
 import { useSignOut } from '../../hooks/useSignOut';
@@ -11,6 +11,7 @@ import { cn } from '../../lib/cn';
 
 const NAV = [
   { to: '/owner', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/owner/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/owner/bookings', label: 'Bookings', icon: CalendarRange },
   { to: '/owner/rooms', label: 'Rooms', icon: BedDouble },
   { to: '/owner/properties', label: 'Properties', icon: Building2 },
@@ -84,7 +85,7 @@ export default function OwnerLayout({ theme, toggleTheme }) {
         <Link to="/owner/rooms/new" className="flex items-center justify-center" aria-label="Add room">
           <span className="flex h-12 w-12 -translate-y-3 items-center justify-center rounded-2xl bg-brand text-white shadow-[0_10px_24px_-8px_var(--brand)]"><Plus className="h-6 w-6" /></span>
         </Link>
-        {NAV.slice(2).map(({ to, label, icon: Icon }) => (
+        {NAV.slice(2, 4).map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} className={({ isActive }) => cn('flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium', isActive ? 'text-brand' : 'text-muted')}>
             <Icon className="h-[22px] w-[22px]" /> {label}
           </NavLink>

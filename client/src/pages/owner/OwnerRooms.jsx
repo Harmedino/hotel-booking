@@ -41,7 +41,13 @@ export default function OwnerRooms() {
 
   return (
     <>
-      <OwnerHeader title="Rooms" description={`${rooms.length} listing${rooms.length === 1 ? '' : 's'} across your properties`} action={<Button to="/owner/rooms/new"><Plus className="h-4 w-4" /> Add room</Button>} />
+      <OwnerHeader title="Rooms" description={`${rooms.length} listing${rooms.length === 1 ? '' : 's'} across your properties`} action={
+        <div className="flex gap-2">
+          {/* The phone tab bar has no room for Properties. */}
+          <Button to="/owner/properties" variant="secondary" className="lg:hidden">Properties</Button>
+          <Button to="/owner/rooms/new"><Plus className="h-4 w-4" /> Add room</Button>
+        </div>
+      } />
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-72 rounded-[24px]" />)}</div>
       ) : rooms.length === 0 ? (

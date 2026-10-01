@@ -55,7 +55,12 @@ function Receipt_({ b }) {
         {b.hotel.contact && <p className="text-muted">{b.hotel.contact}</p>}
       </div>
       <div className="space-y-2 border-t border-line pt-4">
-        <div className="flex justify-between"><span className="text-muted">{money(b.pricePerNight)} × {plural(b.nights, 'night')}</span><span className="text-ink">{money(b.subtotal)}</span></div>
+        {(b.priceLines?.length ? b.priceLines : [{ label: 'Standard', price: b.pricePerNight, nights: b.nights }]).map((l) => (
+          <div key={`${l.label}-${l.price}`} className="flex justify-between">
+            <span className="text-muted">{money(l.price)} × {plural(l.nights, 'night')}{l.label !== 'Standard' ? ` · ${l.label}` : ''}</span>
+            <span className="text-ink">{money(l.price * l.nights)}</span>
+          </div>
+        ))}
         {b.discount > 0 && <div className="flex justify-between text-emerald-600"><span>Promo {b.promoCode}</span><span>−{money(b.discount)}</span></div>}
         <div className="flex justify-between"><span className="text-muted">Taxes & fees</span><span className="text-ink">{money(b.taxes)}</span></div>
         <div className="flex justify-between border-t border-line pt-2 text-base font-semibold text-ink"><span>Total</span><span>{money(b.totalPrice)}</span></div>
@@ -194,7 +199,7 @@ export default function MyBookings() {
         open={Boolean(viewing)}
         onClose={() => setViewing(null)}
         title="Booking details"
-        footer={<Button variant="secondary" className="w-full" onClick={() => window.print()}><Printer className="h-4 w-4" /> Print receipt</Button>}
+        footer={viewing && <Button to={`/bookings/${viewing.id}/receipt`} variant="secondary" className="w-full"><Printer className="h-4 w-4" /> Printable receipt</Button>}
       >
         {viewing && <Receipt_ b={viewing} />}
       </Modal>

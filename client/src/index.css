@@ -117,4 +117,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media print {
   .no-print { display: none !important; }
   body { background: white; }
+  /* Receipts print in light colours even from dark mode. */
+  :root, .dark {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f1f4f9;
+    --border: #e3e8f0;
+    --text: #0b1324;
+    --muted: #5b6678;
+  }
 }

@@ -28,6 +28,8 @@ const Dashboard = lazy(() => import('./pages/owner/Dashboard'));
 const OwnerRooms = lazy(() => import('./pages/owner/OwnerRooms'));
 const RoomForm = lazy(() => import('./pages/owner/RoomForm'));
 const OwnerBookings = lazy(() => import('./pages/owner/OwnerBookings'));
+const OwnerCalendar = lazy(() => import('./pages/owner/OwnerCalendar'));
+const Receipt = lazy(() => import('./pages/Receipt'));
 const Properties = lazy(() => import('./pages/owner/Properties'));
 
 const TITLES = {
@@ -39,6 +41,7 @@ const TITLES = {
   '/login': 'Sign in · QuickStay',
   '/register': 'Create account · QuickStay',
   '/owner': 'Dashboard · QuickStay Host',
+  '/owner/calendar': 'Calendar · QuickStay Host',
 };
 
 function ScrollAndTitle() {
@@ -74,6 +77,7 @@ export default function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/my-bookings" element={<RequireAuth><MyBookings /></RequireAuth>} />
+            <Route path="/bookings/:id/receipt" element={<RequireAuth><Receipt /></RequireAuth>} />
             <Route path="/booking/success" element={<RequireAuth><BookingSuccess /></RequireAuth>} />
             <Route path="/saved" element={<RequireAuth><Saved /></RequireAuth>} />
             <Route path="/account" element={<RequireAuth><Account theme={theme} toggleTheme={toggle} /></RequireAuth>} />
@@ -84,6 +88,7 @@ export default function App() {
               <Route path="rooms/new" element={<RoomForm />} />
               <Route path="rooms/:id/edit" element={<RoomForm />} />
               <Route path="bookings" element={<OwnerBookings />} />
+              <Route path="calendar" element={<OwnerCalendar />} />
               <Route path="properties" element={<Properties />} />
             </Route>
             <Route path="*" element={<NotFound />} />
