@@ -1,10 +1,10 @@
 const express = require('express');
-const { User, Hotel, Room, Booking, Review } = require('../models');
-const { validate, z, objectId } = require('../lib/validate');
-const { ah, notFound, badRequest } = require('../lib/errors');
+const { User, Hotel, Room, RoomBlock, Booking, Review } = require('../models');
+const { validate, z, objectId, isoDate } = require('../lib/validate');
+const { ah, notFound, badRequest, conflict } = require('../lib/errors');
 const { requireAuth, requireOwner } = require('../lib/auth');
-const { cancelBooking } = require('../lib/bookings');
-const { todayIso } = require('../lib/pricing');
+const { cancelBooking, usedByNight, peakUsed, activeFilter } = require('../lib/bookings');
+const { todayIso, addDays: addDaysIso, nightsBetween, rateFor } = require('../lib/pricing');
 const serialize = require('../lib/serializers');
 
 const router = express.Router();
@@ -61,6 +61,7 @@ router.delete('/hotels/:id', ah(async (req, res) => {
   await Promise.all([
     Booking.deleteMany({ hotel: hotel._id }),
     Review.deleteMany({ hotel: hotel._id }),
+    RoomBlock.deleteMany({ hotel: hotel._id }),
     Room.deleteMany({ hotel: hotel._id }),
     User.updateMany({}, { $pull: { wishlist: { $in: roomIds } } }),
   ]);
@@ -78,6 +79,16 @@ const roomSchema = z.object({
   amenities: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
   images: z.array(z.string().trim().min(1).max(500)).min(1, 'add at least one photo').max(8),
   isAvailable: z.boolean().default(true),
+  // null clears it.
+  weekendPrice: z.number().positive().max(100000).nullable().optional(),
+  seasonalRates: z
+    .array(
+      z
+        .object({ name: z.string().trim().min(2).max(40), start: isoDate, end: isoDate, price: z.number().positive().max(100000) })
+        .refine((r) => r.start <= r.end, { message: 'must end on or after its start date', path: ['end'] })
+    )
+    .max(12)
+    .optional(),
 });
 
 const HOTEL_FIELDS = 'name city country address contact description';
@@ -121,6 +132,7 @@ router.delete('/rooms/:id', ah(async (req, res) => {
   await Promise.all([
     Booking.deleteMany({ room: room._id }),
     Review.deleteMany({ room: room._id }),
+    RoomBlock.deleteMany({ room: room._id }),
     User.updateMany({ wishlist: room._id }, { $pull: { wishlist: room._id } }),
   ]);
   await room.deleteOne();
@@ -269,6 +281,88 @@ router.get('/stats', validate(z.object({ days: z.coerce.number().int().refine((d
     recent: recent.map(serialize.booking),
     totals: { hotels: hotelIds.length, rooms: rooms.length, rating: rating[0] ? Math.round(rating[0].avg * 10) / 10 : null },
   });
+}));
+
+// ---- Occupancy calendar and blocked dates ----
+
+const calendarSchema = z.object({ from: isoDate.optional(), days: z.coerce.number().int().min(1).max(31).default(14) });
+
+// Every room × night: units in use, and who is staying.
+router.get('/calendar', validate(calendarSchema, 'query'), ah(async (req, res) => {
+  const from = req.validQuery.from || todayIso();
+  const to = addDaysIso(from, req.validQuery.days);
+  const hotelIds = await ownHotelIds(req.user._id);
+  const rooms = await Room.find({ hotel: { $in: hotelIds } }).populate('hotel', 'name').sort({ hotel: 1, pricePerNight: 1 });
+  const roomIds = rooms.map((r) => r._id);
+  const [used, bookings, blocks] = await Promise.all([
+    usedByNight(roomIds, from, to),
+    Booking.find({ room: { $in: roomIds }, ...activeFilter(), checkIn: { $lt: to }, checkOut: { $gt: from } })
+      .select('reference room guestName guests checkIn checkOut status isPaid')
+      .sort({ checkIn: 1 })
+      .lean(),
+    RoomBlock.find({ room: { $in: roomIds }, start: { $lt: to }, end: { $gt: from } }).sort({ start: 1 }).lean(),
+  ]);
+  const dates = [];
+  for (let d = from; d < to; d = addDaysIso(d, 1)) dates.push(d);
+
+  res.json({
+    from,
+    to,
+    dates,
+    rooms: rooms.map((r) => {
+      const nights = used.get(String(r._id));
+      return {
+        id: String(r._id),
+        roomType: r.roomType,
+        hotelName: r.hotel?.name || '',
+        totalUnits: r.totalUnits,
+        isAvailable: r.isAvailable,
+        nights: dates.map((d) => ({ date: d, used: Math.min(nights?.get(d) || 0, r.totalUnits), price: rateFor(r, d).price })),
+        bookings: bookings
+          .filter((b) => String(b.room) === String(r._id))
+          .map((b) => ({ id: String(b._id), reference: b.reference, guestName: b.guestName, guests: b.guests, checkIn: b.checkIn, checkOut: b.checkOut, status: b.status, isPaid: b.isPaid })),
+        blocks: blocks
+          .filter((b) => String(b.room) === String(r._id))
+          .map((b) => ({ id: String(b._id), start: b.start, end: b.end, units: b.units, note: b.note })),
+      };
+    }),
+  });
+}));
+
+const blockSchema = z
+  .object({
+    roomId: objectId,
+    start: isoDate,
+    end: isoDate,
+    units: z.number().int().min(1).max(500).optional(),
+    note: z.string().trim().max(120).default(''),
+  })
+  .refine((b) => b.end > b.start, { message: 'must be after the first night', path: ['end'] });
+
+// Take units out of sale. Can't block what guests have already booked.
+router.post('/blocks', validate(blockSchema), ah(async (req, res) => {
+  const { roomId, start, end, note } = req.body;
+  if (start < todayIso()) throw badRequest('You can only block today or later');
+  if (nightsBetween(start, end) > 180) throw badRequest('Block at most 180 nights at a time');
+  const room = await ownRoom(req.user._id, roomId);
+  const units = Math.min(req.body.units || room.totalUnits, room.totalUnits);
+  const free = room.totalUnits - peakUsed((await usedByNight([room._id], start, end)).get(String(room._id)));
+  if (units > free) {
+    throw conflict(
+      free > 0
+        ? `Guests are booked on some of those nights. You can block at most ${free} of ${room.totalUnits} then.`
+        : 'Every unit is already booked or blocked on some of those nights.'
+    );
+  }
+  const block = await RoomBlock.create({ room: room._id, hotel: room.hotel, start, end, units, note });
+  res.status(201).json({ id: String(block._id), roomId, start, end, units, note });
+}));
+
+router.delete('/blocks/:id', ah(async (req, res) => {
+  const block = await RoomBlock.findOne({ _id: req.params.id, hotel: { $in: await ownHotelIds(req.user._id) } });
+  if (!block) throw notFound('Blocked dates not found');
+  await block.deleteOne();
+  res.json({ ok: true });
 }));
 
 module.exports = router;

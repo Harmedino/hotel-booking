@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const { User, Hotel, Room, Booking, Review, PromoCode } = require('../models');
+const { User, Hotel, Room, RoomBlock, Booking, Review, PromoCode } = require('../models');
 const { quote } = require('../lib/pricing');
 
 const img = (n) => `/static/seed/roomImg${n}.png`;
@@ -62,6 +62,14 @@ const addDays = (n) => {
   return d.toISOString().slice(0, 10);
 };
 const daysAgo = (n) => new Date(Date.now() - n * 86400000);
+const roundTo5 = (n) => Math.round(n / 5) * 5;
+
+// The coming festive season (20 Dec – 2 Jan), priced up across every room.
+function festiveSeason() {
+  const now = new Date();
+  const year = now.getUTCMonth() === 0 && now.getUTCDate() <= 2 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  return { name: 'Festive season', start: `${year}-12-20`, end: `${year + 1}-01-02` };
+}
 
 async function seed() {
   const passwordHash = await bcrypt.hash('password123', 10);
@@ -89,7 +97,14 @@ async function seed() {
       const room = await Room.create({
         hotel: hotel._id, roomType: t.roomType, description: DESCRIPTIONS[t.roomType], pricePerNight: price,
         maxGuests: t.maxGuests, totalUnits: t.units, amenities: t.amenities, images: rotate(n), createdAt: daysAgo(100 - n),
+        // The bigger rooms cost more on Friday and Saturday nights.
+        weekendPrice: t.price >= 300 ? roundTo5(price * 1.2) : null,
+        seasonalRates: [{ ...festiveSeason(), price: roundTo5(price * 1.35) }],
       });
+      // One room in for maintenance next week, so the calendars show a block.
+      if (n === 1) {
+        await RoomBlock.create({ room: room._id, hotel: hotel._id, start: addDays(8), end: addDays(10), units: 1, note: 'Repainting' });
+      }
 
       // Past stays with reviews, plus upcoming bookings for the dashboard.
       const stays = [

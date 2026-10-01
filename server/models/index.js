@@ -31,6 +31,13 @@ const Room = model('Room', new Schema({
   roomType: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
   pricePerNight: { type: Number, required: true, min: 0.01 },
+  // Friday and Saturday nights; empty = the normal price.
+  weekendPrice: { type: Number, min: 0.01, default: null },
+  // Inclusive 'YYYY-MM-DD' ranges, e.g. the festive season. Beats the weekend price.
+  seasonalRates: {
+    type: [{ _id: false, name: { type: String, required: true }, start: { type: String, required: true }, end: { type: String, required: true }, price: { type: Number, required: true, min: 0.01 } }],
+    default: [],
+  },
   maxGuests: { type: Number, default: 2, min: 1 },
   totalUnits: { type: Number, default: 1, min: 1 },
   amenities: { type: [String], default: [] },
@@ -54,6 +61,8 @@ const bookingSchema = new Schema({
   guests: { type: Number, required: true, min: 1 },
   nights: { type: Number, required: true, min: 1 },
   pricePerNight: { type: Number, required: true },
+  // How the subtotal was made up when rates varied (weekend, season).
+  priceLines: { type: [{ _id: false, label: String, price: Number, nights: Number }], default: undefined },
   subtotal: { type: Number, required: true },
   discount: { type: Number, default: 0 },
   taxes: { type: Number, default: 0 },
@@ -75,6 +84,18 @@ const bookingSchema = new Schema({
 bookingSchema.index({ room: 1, checkIn: 1, checkOut: 1 });
 bookingSchema.index({ stripeSessionId: 1 }, { unique: true, partialFilterExpression: { stripeSessionId: { $type: 'string' } } });
 const Booking = model('Booking', bookingSchema);
+
+// Units taken out of sale (maintenance, owner use) for [start, end), like a stay.
+const roomBlockSchema = new Schema({
+  room: { type: Schema.Types.ObjectId, ref: 'Room', required: true },
+  hotel: { type: Schema.Types.ObjectId, ref: 'Hotel', required: true, index: true },
+  start: { type: String, required: true },
+  end: { type: String, required: true },
+  units: { type: Number, required: true, min: 1 },
+  note: { type: String, default: '' },
+}, opts);
+roomBlockSchema.index({ room: 1, start: 1, end: 1 });
+const RoomBlock = model('RoomBlock', roomBlockSchema);
 
 const Review = model('Review', new Schema({
   booking: { type: Schema.Types.ObjectId, ref: 'Booking', required: true, unique: true },
@@ -105,4 +126,4 @@ const Subscriber = model('Subscriber', new Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
 }, opts));
 
-module.exports = { User, Hotel, Room, Booking, Review, PromoCode, Image, Subscriber };
+module.exports = { User, Hotel, Room, RoomBlock, Booking, Review, PromoCode, Image, Subscriber };
