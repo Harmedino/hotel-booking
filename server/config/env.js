@@ -122,9 +122,6 @@ const env = {
     pass: read('SMTP_PASS') || '',
   },
   mailFrom,
-  // Seeds demo data only into a completely empty database, and never in
-  // production unless explicitly enabled with SEED_ON_EMPTY=true.
-  seedOnEmpty: read('SEED_ON_EMPTY') ? read('SEED_ON_EMPTY') === 'true' : !isProd,
 };
 
 module.exports = env;

@@ -8,16 +8,17 @@ Express + MongoDB (Mongoose) API for the QuickStay hotel booking platform.
 cd server
 cp .env.example .env      # set MONGODB_URI (Atlas, or a local replica set)
 npm install
-npm run dev               # seeds demo data on an empty DB, starts on :4000
+npm run dev               # starts on :4000
 npm test                  # API tests (uses the quickstay_test database; needs a replica set)
 ```
 
-Demo accounts (password `password123`): `guest@quickstay.app` and `owner@quickstay.app`.
+Register in the app to create a guest account; adding a hotel from "List your property" makes it an owner.
 
 ## Structure
 
 - `models/index.js` – Mongoose schemas (indexes are synced on boot)
-- `db/seed.js` – demo hotels, rooms, bookings, reviews and promo codes
+- `db/removeDemoData.js` – on start-up, deletes the demo accounts and hotels older versions seeded
+- `test/fixtures.js` – test-only hotels, rooms, bookings, reviews and promo codes
 - `lib/bookings.js` – availability, pricing and the booking lifecycle
 - `routes/` – HTTP endpoints
 

@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const mongoose = require('mongoose');
 const { connect, disconnect } = require('../db/connect');
-const { seed } = require('../db/seed');
+const { loadFixtures, OWNER, GUEST } = require('./fixtures');
 const app = require('../app');
 
 const api = request(app);
@@ -24,9 +24,9 @@ before(async () => {
   await mongoose.connection.dropDatabase();
   await connect();
   await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes()));
-  await seed();
-  guestToken = (await api.post('/api/auth/login').send({ email: 'guest@quickstay.app', password: 'password123' })).body.token;
-  ownerToken = (await api.post('/api/auth/login').send({ email: 'owner@quickstay.app', password: 'password123' })).body.token;
+  await loadFixtures();
+  guestToken = (await api.post('/api/auth/login').send(GUEST)).body.token;
+  ownerToken = (await api.post('/api/auth/login').send(OWNER)).body.token;
 });
 
 after(() => disconnect());
@@ -73,7 +73,7 @@ test('booking: quote, promo, overbooking protection, cancel', async () => {
   assert.equal(owner.status, 201);
   // Guest became an owner; create a room with a single unit.
   const room = await api.post('/api/owner/rooms').set(auth(guestToken)).send({
-    hotelId: owner.body.id, roomType: 'Tiny Room', pricePerNight: 100, maxGuests: 2, totalUnits: 1, images: ['/static/seed/roomImg1.png'],
+    hotelId: owner.body.id, roomType: 'Tiny Room', pricePerNight: 100, maxGuests: 2, totalUnits: 1, images: ['/static/test/roomImg1.png'],
   });
   assert.equal(room.status, 201);
   const roomId = room.body.id;
@@ -87,7 +87,7 @@ test('booking: quote, promo, overbooking protection, cancel', async () => {
 
   const body = {
     roomId, checkIn: day(10), checkOut: day(13), guests: 2, paymentMethod: 'pay_at_hotel',
-    guestName: 'Gabriel', guestEmail: 'guest@quickstay.app', promoCode: 'SUMMER25',
+    guestName: 'Gabriel', guestEmail: GUEST.email, promoCode: 'SUMMER25',
   };
   const b1 = await api.post('/api/bookings').set(auth(ownerToken)).send(body);
   assert.equal(b1.status, 201);
@@ -174,7 +174,7 @@ test('wishlist and newsletter', async () => {
 test('race: five simultaneous bookings for the last unit, exactly one wins', async () => {
   const hotels = await api.get('/api/owner/hotels').set(auth(ownerToken));
   const room = await api.post('/api/owner/rooms').set(auth(ownerToken)).send({
-    hotelId: hotels.body[0].id, roomType: 'Last Room', pricePerNight: 50, totalUnits: 1, images: ['/static/seed/roomImg2.png'],
+    hotelId: hotels.body[0].id, roomType: 'Last Room', pricePerNight: 50, totalUnits: 1, images: ['/static/test/roomImg2.png'],
   });
   const body = {
     roomId: room.body.id, checkIn: day(40), checkOut: day(42), guests: 1, paymentMethod: 'pay_at_hotel',
@@ -193,7 +193,7 @@ test('smart pricing: weekend and seasonal rates, night by night', async () => {
   const room = await api.post('/api/owner/rooms').set(auth(ownerToken)).send({
     hotelId: hotels.body[0].id, roomType: 'Priced Room', pricePerNight: 100, weekendPrice: 150, totalUnits: 2,
     seasonalRates: [{ name: 'Carnival', start: day(thu + 7), end: day(thu + 7), price: 300 }],
-    images: ['/static/seed/roomImg1.png'],
+    images: ['/static/test/roomImg1.png'],
   });
   assert.equal(room.status, 201);
   assert.equal(room.body.weekendPrice, 150);
@@ -225,7 +225,7 @@ test('smart pricing: weekend and seasonal rates, night by night', async () => {
 test('blocked dates take units out of sale; calendars show it', async () => {
   const hotels = await api.get('/api/owner/hotels').set(auth(ownerToken));
   const room = (await api.post('/api/owner/rooms').set(auth(ownerToken)).send({
-    hotelId: hotels.body[0].id, roomType: 'Blockable Room', pricePerNight: 80, totalUnits: 2, images: ['/static/seed/roomImg1.png'],
+    hotelId: hotels.body[0].id, roomType: 'Blockable Room', pricePerNight: 80, totalUnits: 2, images: ['/static/test/roomImg1.png'],
   })).body;
   const stay = {
     roomId: room.id, checkIn: day(70), checkOut: day(71), guests: 1, paymentMethod: 'pay_at_hotel',
