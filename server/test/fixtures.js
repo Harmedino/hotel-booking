@@ -1,9 +1,11 @@
+// Test-only data: hotels, rooms, bookings, reviews and promo codes for test/api.test.js.
+// Never loaded by the app.
 const bcrypt = require('bcryptjs');
 const { User, Hotel, Room, RoomBlock, Booking, Review, PromoCode } = require('../models');
 const { quote } = require('../lib/pricing');
 
-const img = (n) => `/static/seed/roomImg${n}.png`;
-const offerImg = (n) => `/static/seed/exclusiveOfferCardImg${n}.png`;
+const img = (n) => `/static/test/roomImg${n}.png`;
+const offerImg = (n) => `/static/test/exclusiveOfferCardImg${n}.png`;
 const rotate = (start) => [1, 2, 3, 4].map((i) => img(((start + i - 2) % 4) + 1));
 
 const HOTELS = [
@@ -71,11 +73,13 @@ function festiveSeason() {
   return { name: 'Festive season', start: `${year}-12-20`, end: `${year + 1}-01-02` };
 }
 
-async function seed() {
-  const passwordHash = await bcrypt.hash('password123', 10);
+const PASSWORD = 'password123';
+
+async function loadFixtures() {
+  const passwordHash = await bcrypt.hash(PASSWORD, 10);
   const [owner, guest, ...others] = await User.insertMany([
-    { name: 'Olivia Owner', email: 'owner@quickstay.app', passwordHash, role: 'owner' },
-    { name: 'Gabriel Guest', email: 'guest@quickstay.app', passwordHash },
+    { name: 'Olivia Owner', email: 'owner@example.com', passwordHash, role: 'owner' },
+    { name: 'Gabriel Guest', email: 'guest@example.com', passwordHash },
     { name: 'Emma Rodriguez', email: 'emma@example.com', passwordHash },
     { name: 'Liam Johnson', email: 'liam@example.com', passwordHash },
     { name: 'Sophia Lee', email: 'sophia@example.com', passwordHash },
@@ -140,32 +144,6 @@ async function seed() {
       }
     }
   }
-  console.log('Seeded demo data. Owner: owner@quickstay.app / Guest: guest@quickstay.app (password123)');
 }
 
-// Only ever seeds a completely empty database: never adds to or overwrites real data.
-async function seedIfEmpty() {
-  const counts = await Promise.all([User, Hotel, Room, Booking].map((m) => m.estimatedDocumentCount()));
-  if (counts.some((n) => n > 0)) return false;
-  try {
-    await seed();
-    return true;
-  } catch (err) {
-    // Another instance seeded at the same moment (unique email index): not an error.
-    if (err.code === 11000) return false;
-    throw err;
-  }
-}
-
-module.exports = { seed, seedIfEmpty };
-
-if (require.main === module) {
-  const { connect, disconnect } = require('./connect');
-  connect()
-    .then(seedIfEmpty)
-    .then(disconnect)
-    .catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-}
+module.exports = { loadFixtures, OWNER: { email: 'owner@example.com', password: PASSWORD }, GUEST: { email: 'guest@example.com', password: PASSWORD } };

@@ -13,7 +13,7 @@ Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas), t
 - **Connect → Drivers** → copy the `mongodb+srv://…` string, put your password in, and add
   the database name before the `?`, e.g. `…mongodb.net/quickstay?retryWrites=true&w=majority`.
 
-Collections, indexes and demo data are created automatically the first time the API starts.
+Collections and indexes are created automatically the first time the API starts.
 
 ## 2. Backend on Render
 **New → Web Service** → pick `Harmedino/hotel-booking`:
@@ -41,7 +41,6 @@ Environment variables:
 | `JWT_SECRET` | 32+ random characters (`openssl rand -hex 32`); weak values like `change-me` are rejected |
 | `CLIENT_URL` | Vercel URL, no trailing slash (add after step 3) |
 | `APP_URL` | same as `CLIENT_URL` |
-| `SEED_ON_EMPTY` | optional: `true` seeds demo hotels and demo logins into an empty database once; never touches existing data |
 | `STRIPE_SECRET_KEY` | optional, enables card payments |
 | `STRIPE_WEBHOOK_SECRET` | optional, from a Stripe webhook pointing at `<render-url>/api/payments/webhook` (event `checkout.session.completed`) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | optional, enables emails |

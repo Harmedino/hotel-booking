@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Mail, Lock, UserRound, Building2 } from 'lucide-react';
+import { Mail, Lock } from 'lucide-react';
 import AuthLayout from '../components/layout/AuthLayout';
 import { Input } from '../components/ui/Field';
 import Button from '../components/ui/Button';
@@ -9,11 +9,6 @@ import { useToast } from '../components/ui/Toast';
 import { useLoginMutation, errorMessage } from '../store/api';
 import { setCredentials } from '../store/authSlice';
 import { safeNext } from '../lib/safeNext';
-
-const DEMOS = [
-  { label: 'Demo guest', email: 'guest@quickstay.app', icon: UserRound },
-  { label: 'Demo hotel owner', email: 'owner@quickstay.app', icon: Building2 },
-];
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -47,17 +42,6 @@ export default function Login() {
         {error && <p className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <Button size="lg" className="w-full" loading={isLoading}>Sign in</Button>
       </form>
-
-      <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wider text-muted">
-        <span className="h-px flex-1 bg-line" /> or explore instantly <span className="h-px flex-1 bg-line" />
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {DEMOS.map(({ label, email, icon: Icon }) => (
-          <Button key={email} variant="secondary" disabled={isLoading} onClick={() => doLogin({ email, password: 'password123' })}>
-            <Icon className="h-4 w-4" /> {label}
-          </Button>
-        ))}
-      </div>
 
       <p className="mt-8 text-center text-sm text-muted">
         New to QuickStay? <Link to={`/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next'))}` : ''}`} className="font-semibold text-brand">Create an account</Link>
