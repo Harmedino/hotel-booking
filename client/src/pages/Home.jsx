@@ -57,11 +57,13 @@ function Hero() {
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, delay: 0.35 }} className="mt-8 md:mt-10">
           <SearchBar />
         </motion.div>
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-10 grid max-w-2xl grid-cols-3 gap-6">
-          <Stat value={stats?.hotels} suffix="+" label="Partner hotels" />
-          <Stat value={stats?.bookings} suffix="+" label="Stays booked" />
-          <Stat value={Number(stats?.avgRating)} decimals={1} suffix="★" label="Average rating" />
-        </motion.div>
+        {stats?.hotels > 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-10 grid max-w-2xl grid-cols-3 gap-6">
+            <Stat value={stats.hotels} suffix="+" label="Partner hotels" />
+            <Stat value={stats.bookings} suffix="+" label="Stays booked" />
+            <Stat value={Number(stats.avgRating)} decimals={1} suffix="★" label="Average rating" />
+          </motion.div>
+        )}
       </div>
     </section>
   );
@@ -69,6 +71,7 @@ function Hero() {
 
 function Destinations() {
   const { data: cities, isLoading } = useGetCitiesQuery();
+  if (!isLoading && !cities?.length) return null;
   return (
     <section className={`${wrap} py-16 md:py-24`}>
       <Reveal>
@@ -107,6 +110,7 @@ function Destinations() {
 
 function Featured() {
   const { data: rooms, isLoading } = useGetFeaturedQuery();
+  if (!isLoading && !rooms?.length) return null;
   return (
     <section className="bg-surface py-16 md:py-24">
       <div className={wrap}>
